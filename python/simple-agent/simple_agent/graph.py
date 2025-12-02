@@ -1,5 +1,4 @@
 from pathlib import Path
-from textwrap import dedent
 from typing import Annotated, List, Optional
 
 from langchain_community.agent_toolkits import FileManagementToolkit
@@ -11,11 +10,16 @@ from pydantic import BaseModel, Field
 
 from simple_agent.models import model
 from simple_agent.tools.file_static_tools import count_words
+from simple_agent.prompt_loader import SystemPromptLoader
 
 
 class TaskConfiguration(BaseModel):
-    topic_prompt: str = Field(description="用户希望生成的文本的具体主题、大纲或开头提示")
-    target_word_count: int = Field(default=5000, description="生成文本的目标字数。如果未指定，默认为5000")
+    topic_prompt: str = Field(
+        description="用户希望生成的文本的具体主题、大纲或开头提示"
+    )
+    target_word_count: int = Field(
+        default=5000, description="生成文本的目标字数。如果未指定，默认为5000"
+    )
     output_file: str = Field(description="生成文本的输出文件名字。必须包含扩展名。")
 
 
@@ -28,6 +32,9 @@ class TextGenerator:
 
     def __init__(self, work_directory: str = "."):
         self.work_directory = Path(work_directory).resolve()
+
+        # 初始化系统提示词加载器
+        self.prompt_loader = SystemPromptLoader()
 
         # 初始化文件工具
         file_toolkit = FileManagementToolkit(
@@ -62,7 +69,10 @@ class TextGenerator:
         workflow.add_edge("parse_request", "call_model")
 
         # 添加条件边
-        workflow.add_conditional_edges("call_model", tools_condition, )
+        workflow.add_conditional_edges(
+            "call_model",
+            tools_condition,
+        )
 
         workflow.add_edge("tools", "call_model")
 
@@ -74,25 +84,18 @@ class TextGenerator:
         last_message = state.messages[-1]
         user_input = last_message.content
 
-        config: TaskConfiguration = await  self.parser_llm.ainvoke(user_input)
+        config: TaskConfiguration = await self.parser_llm.ainvoke(user_input)
 
-        system_prompt = dedent(f"""
-             你是一个专业的长篇文本生成助手。
+        # 使用系统提示词加载器渲染提示词，注入任务配置变量
+        system_prompt = self.prompt_loader.render(
+            work_directory=str(self.work_directory),
+            topic_prompt=config.topic_prompt,
+            target_word_count=config.target_word_count,
+            output_file=config.output_file,
+            tools=self.tools,
+        )
 
-            核心任务：
-            1. 主题："{config.topic_prompt}"
-            2. 目标字数：{config.target_word_count} 字
-            3. 输出文件：{config.output_file}
-
-            请分段生成内容，每次生成一部分后立即调用 `write_file` 工具保存。
-            每次保存后，**务必**调用 `count_words` 检查字数。
-            字数达到要求后，回复“任务完成”。
-        """).strip()
-
-        return {
-            "config": config,
-            "messages": [SystemMessage(content=system_prompt)]
-        }
+        return {"config": config, "messages": [SystemMessage(content=system_prompt)]}
 
     async def call_model_node(self, state: AgentState):
         """
@@ -109,21 +112,25 @@ class TextGenerator:
             messages=[
                 HumanMessage(content=user_instructions),
             ],
-            config=None
+            config=None,
         )
 
         # 运行图
         # stream_mode="values" 可以看到每一步的消息流转
-        async for event in self.graph.astream(initial_state, stream_mode="values", config={"recursion_limit": 100}):
+        async for event in self.graph.astream(
+            initial_state, stream_mode="values", config={"recursion_limit": 100}
+        ):
             last_msg = event["messages"][-1]
             # 打印日志观察 LLM 的行为
             if last_msg.type == "ai":
                 if hasattr(last_msg, "tool_calls") and last_msg.tool_calls:
-                    print(f"🤖 模型决定调用工具: {[tc['name'] for tc in last_msg.tool_calls]}")
+                    print(
+                        f"模型决定调用工具: {[tc['name'] for tc in last_msg.tool_calls]}"
+                    )
                 else:
-                    print(f"🤖 模型回复: {last_msg.content[:100]}...")
+                    print(f"模型回复: {last_msg.content[:100]}...")
             elif last_msg.type == "tool":
-                print(f"🛠️ 工具执行完成，结果长度: {len(str(last_msg.content))}")
+                print(f"工具执行完成，结果长度: {len(str(last_msg.content))}")
 
         print("=" * 50)
         print("流程结束")

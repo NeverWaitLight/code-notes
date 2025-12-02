@@ -59,6 +59,8 @@ class SystemPromptLoader:
         self,
         work_directory: Optional[str] = None,
         user_id: Optional[str] = None,
+        task_description: Optional[str] = None,
+        steps: Optional[str] = None,
         topic_prompt: Optional[str] = None,
         target_word_count: Optional[int] = None,
         output_file: Optional[str] = None,
@@ -71,9 +73,11 @@ class SystemPromptLoader:
         Args:
             work_directory: 工作目录路径
             user_id: 用户ID
-            topic_prompt: 任务主题
-            target_word_count: 目标字数
-            output_file: 输出文件名
+            task_description: 任务描述
+            steps: 任务步骤（已格式化的字符串）
+            topic_prompt: 任务主题（已废弃，保留以兼容旧代码）
+            target_word_count: 目标字数（已废弃，保留以兼容旧代码）
+            output_file: 输出文件名（已废弃，保留以兼容旧代码）
             tools: 工具列表
             **kwargs: 其他自定义变量
 
@@ -91,6 +95,13 @@ class SystemPromptLoader:
         if user_id is not None:
             variables["user_id"] = str(user_id)
 
+        if task_description is not None:
+            variables["task_description"] = str(task_description)
+
+        if steps is not None:
+            variables["steps"] = str(steps)
+
+        # 保留旧参数以兼容旧代码
         if topic_prompt is not None:
             variables["topic_prompt"] = str(topic_prompt)
 

@@ -14,13 +14,13 @@ from simple_agent.prompt_loader import SystemPromptLoader
 
 
 class TaskConfiguration(BaseModel):
-    topic_prompt: str = Field(
-        description="用户希望生成的文本的具体主题、大纲或开头提示"
+    task_description: str = Field(
+        description="用户请求的完整任务描述，清晰准确地概括任务目标"
     )
-    target_word_count: int = Field(
-        default=5000, description="生成文本的目标字数。如果未指定，默认为5000"
+    steps: Optional[List[str]] = Field(
+        default=None,
+        description="任务分解后的步骤列表（to-do list）。如果任务简单只需要一步就能完成，可以为空或只包含一个步骤。对于复杂任务，应该将其分解为多个清晰的、可执行的步骤，每个步骤都应该是一个具体的行动项。模型将在事件循环中按顺序执行这些步骤，每完成一个步骤后检查进度并继续执行后续步骤。"
     )
-    output_file: str = Field(description="生成文本的输出文件名字。必须包含扩展名。")
 
 
 class AgentState(BaseModel):
@@ -69,10 +69,7 @@ class TextGenerator:
         workflow.add_edge("parse_request", "call_model")
 
         # 添加条件边
-        workflow.add_conditional_edges(
-            "call_model",
-            tools_condition,
-        )
+        workflow.add_conditional_edges("call_model", tools_condition, )
 
         workflow.add_edge("tools", "call_model")
 
@@ -86,16 +83,28 @@ class TextGenerator:
 
         config: TaskConfiguration = await self.parser_llm.ainvoke(user_input)
 
+        # 构建任务步骤描述（to-do list）
+        steps_text = ""
+        if config.steps and len(config.steps) > 0:
+            steps_text = "\n任务步骤（To-Do List）：\n"
+            for i, step in enumerate(config.steps, 1):
+                steps_text += f"{i}. {step}\n"
+            steps_text += "\n请在事件循环中按照步骤顺序执行任务。每完成一个步骤后，检查任务进度，确认当前步骤已完成，然后继续执行下一个步骤。如果某个步骤需要多次工具调用才能完成，可以在同一轮中调用多个工具。所有步骤完成后，向用户报告任务完成。"
+        else:
+            steps_text = "\n这是一个简单任务，可以直接执行完成，无需分解步骤。"
+
         # 使用系统提示词加载器渲染提示词，注入任务配置变量
         system_prompt = self.prompt_loader.render(
             work_directory=str(self.work_directory),
-            topic_prompt=config.topic_prompt,
-            target_word_count=config.target_word_count,
-            output_file=config.output_file,
+            task_description=config.task_description,
+            steps=steps_text,
             tools=self.tools,
         )
 
-        return {"config": config, "messages": [SystemMessage(content=system_prompt)]}
+        return {
+            "config": config,
+            "messages": [SystemMessage(content=system_prompt)]
+        }
 
     async def call_model_node(self, state: AgentState):
         """
@@ -112,14 +121,12 @@ class TextGenerator:
             messages=[
                 HumanMessage(content=user_instructions),
             ],
-            config=None,
+            config=None
         )
 
         # 运行图
         # stream_mode="values" 可以看到每一步的消息流转
-        async for event in self.graph.astream(
-            initial_state, stream_mode="values", config={"recursion_limit": 100}
-        ):
+        async for event in self.graph.astream(initial_state, stream_mode="values", config={"recursion_limit": 100}):
             last_msg = event["messages"][-1]
             # 打印日志观察 LLM 的行为
             if last_msg.type == "ai":
@@ -128,7 +135,11 @@ class TextGenerator:
                         f"模型决定调用工具: {[tc['name'] for tc in last_msg.tool_calls]}"
                     )
                 else:
-                    print(f"模型回复: {last_msg.content[:100]}...")
+                    content = last_msg.content
+                    if content:
+                        print(f"模型回复: {content}")
+                    else:
+                        print("模型回复: (空内容)")
             elif last_msg.type == "tool":
                 print(f"工具执行完成，结果长度: {len(str(last_msg.content))}")
 

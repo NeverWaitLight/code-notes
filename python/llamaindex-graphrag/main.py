@@ -3,6 +3,7 @@ import os
 from llama_index.core import Document, PropertyGraphIndex, Settings
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.deepseek import DeepSeek
+from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
 
 # ==========================================
 # 1. 配置 DeepSeek 和 嵌入模型
@@ -30,66 +31,71 @@ Settings.embed_model = embed_model
 
 def main():
     # ==========================================
-    # 2. 准备测试数据 (一段充满隐含关系的文本)
+    # 2. 配置 Neo4j 图数据库存储
+    # ==========================================
+    graph_store = Neo4jPropertyGraphStore(
+        username=os.getenv("NEO4J_USERNAME", "neo4j"),
+        password=os.getenv("NEO4J_PASSWORD", "password"),
+        url=os.getenv("NEO4J_URL", "bolt://localhost:7687"),
+        database=os.getenv("NEO4J_DATABASE", "neo4j"),
+    )
+
+    print("已连接到 Neo4j 图数据库")
+
+    # ==========================================
+    # 3. 准备测试数据 (一段充满隐含关系的文本)
     # ==========================================
     text = """
-    项目代号：‘天网计划’（Skynet）。
+    项目代号：'天网计划'（Skynet）。
     该项目的核心负责人是李雷，但他对外声称自己只是个普通的程序员。
-    韩梅梅是李雷的大学同学，她负责为一家名为‘深海科技’的公司采购高性能显卡。
-    实际上，‘深海科技’是‘天网计划’的硬件供应商。
-    昨天，李雷在某二手交易平台上秘密出售了一批来自‘深海科技’的报废硬盘。
+    韩梅梅是李雷的大学同学，她负责为一家名为'深海科技'的公司采购高性能显卡。
+    实际上，'深海科技'是'天网计划'的硬件供应商。
+    昨天，李雷在某二手交易平台上秘密出售了一批来自'深海科技'的报废硬盘。
     """
 
     documents = [Document(text=text)]
 
     print("\n--------------------------------------------------")
-    print("🚀 开始构建图谱 (DeepSeek 正在疯狂阅读并提取关系)...")
+    print("开始构建图谱并存储到 Neo4j")
     print("--------------------------------------------------")
 
     # ==========================================
-    # 3. 构建图谱索引
+    # 4. 构建图谱索引并存储到 Neo4j
     # ==========================================
-    # 这里 DeepSeek 会被调用，分析文本中的主谓宾关系
     index = PropertyGraphIndex.from_documents(
-        documents,
-        show_progress=True
+        documents, property_graph_store=graph_store, show_progress=True
     )
 
-    print("\n✅ 图谱构建完成！")
+    print("\n图谱已成功存储到 Neo4j 数据库")
 
     # ==========================================
-    # 4. 创建查询引擎
+    # 5. 创建查询引擎
     # ==========================================
-    # include_text=True 表示：既要查图谱关系，也要查原始文本切片 (混合检索)
     query_engine = index.as_query_engine(include_text=True)
 
     # ==========================================
-    # 5. 提问测试
+    # 6. 提问测试
     # ==========================================
-    # 这个问题需要多跳推理：
-    # 韩梅梅 -> 深海科技 -> 天网计划 (供应商关系)
-    # 李雷 -> 天网计划 (负责人)
-    # 结论：韩梅梅和李雷通过天网计划和深海科技存在利益链条
     question = "韩梅梅和李雷之间有什么潜在的商业利益关联？"
 
-    print(f"\n❓ 问题: {question}")
-    print("🤖 DeepSeek 正在思考...")
+    print(f"\n问题: {question}")
+    print("DeepSeek 正在思考...")
 
     response = query_engine.query(question)
 
-    print(f"\n💡 回答:\n{response}")
+    print(f"\n回答:\n{response}")
 
     # ==========================================
-    # 6. (可选) 查看 DeepSeek 到底提取了什么三元组
+    # 7. 查看提取的三元组
     # ==========================================
-    print("\n🔍 [调试] DeepSeek 提取的部分关系图谱:")
+    print("\n提取的部分关系图谱:")
     retriever = index.as_retriever(choice_batch_size=10)
     nodes = retriever.retrieve(question)
-    # 简单打印出被检索到的节点包含的关系
     for node in nodes:
-        # 这里只是简单展示，实际内部结构更复杂
         if "triplet" in node.metadata:
             print(node.metadata["triplet"])
+
+    print("\n可以通过 Neo4j Browser 访问 http://localhost:7474 查看完整图谱")
 
 
 if __name__ == "__main__":

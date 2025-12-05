@@ -7,6 +7,8 @@ dependencies = [
     "llama-index-embeddings-huggingface (>=0.6.1,<0.7.0)",
     "llama-index-llms-deepseek (>=0.2.2,<0.3.0)",
     "llama-index-graph-stores-neo4j (>=0.5.1,<0.6.0)",
+    "llama-index-graph-stores-nebula (>=0.5.1,<0.6.0)",
+    "jupyter-nebulagraph (>=0.14.3,<0.15.0)",
 ]
 
 

@@ -40,62 +40,50 @@ def main():
         database=os.getenv("NEO4J_DATABASE", "neo4j"),
     )
 
-    print("已连接到 Neo4j 图数据库")
+    print("已连接到 Neo4j 图数据库 (数据库: xiyouji)")
 
     # ==========================================
-    # 3. 准备测试数据 (一段充满隐含关系的文本)
+    # 3. 读取西游记文本文件
     # ==========================================
-    text = """
-    项目代号：'天网计划'（Skynet）。
-    该项目的核心负责人是李雷，但他对外声称自己只是个普通的程序员。
-    韩梅梅是李雷的大学同学，她负责为一家名为'深海科技'的公司采购高性能显卡。
-    实际上，'深海科技'是'天网计划'的硬件供应商。
-    昨天，李雷在某二手交易平台上秘密出售了一批来自'深海科技'的报废硬盘。
-    """
+    file_path = r"C:\Users\admin\Downloads\西游记.txt"
 
+    if not os.path.exists(file_path):
+        print(f"错误: 文件不存在: {file_path}")
+        return
+
+    print(f"正在读取文件: {file_path}")
+    with open(file_path, "r", encoding="utf-8") as f:
+        text = f.read()
+
+    print(f"文件读取完成，文本长度: {len(text)} 字符")
+
+    # PropertyGraphIndex 会自动将大文本分块处理
+    # 相同的实体名称会自动合并到同一个节点
     documents = [Document(text=text)]
 
     print("\n--------------------------------------------------")
     print("开始构建图谱并存储到 Neo4j")
+    print("注意: 相同的实体名称会自动合并到同一个节点")
     print("--------------------------------------------------")
 
     # ==========================================
     # 4. 构建图谱索引并存储到 Neo4j
+    # PropertyGraphIndex 会自动:
+    # - 将大文本分块处理
+    # - 提取实体和关系
+    # - 相同名称的实体会自动合并到同一个节点
     # ==========================================
     index = PropertyGraphIndex.from_documents(
         documents, property_graph_store=graph_store, show_progress=True
     )
 
-    print("\n图谱已成功存储到 Neo4j 数据库")
+    print("\n图谱已成功存储到 Neo4j 数据库 (xiyouji)")
 
     # ==========================================
-    # 5. 创建查询引擎
+    # 5. 统计信息
     # ==========================================
-    query_engine = index.as_query_engine(include_text=True)
-
-    # ==========================================
-    # 6. 提问测试
-    # ==========================================
-    question = "韩梅梅和李雷之间有什么潜在的商业利益关联？"
-
-    print(f"\n问题: {question}")
-    print("DeepSeek 正在思考...")
-
-    response = query_engine.query(question)
-
-    print(f"\n回答:\n{response}")
-
-    # ==========================================
-    # 7. 查看提取的三元组
-    # ==========================================
-    print("\n提取的部分关系图谱:")
-    retriever = index.as_retriever(choice_batch_size=10)
-    nodes = retriever.retrieve(question)
-    for node in nodes:
-        if "triplet" in node.metadata:
-            print(node.metadata["triplet"])
-
     print("\n可以通过 Neo4j Browser 访问 http://localhost:7474 查看完整图谱")
+    print("数据库名称: xiyouji")
 
 
 if __name__ == "__main__":

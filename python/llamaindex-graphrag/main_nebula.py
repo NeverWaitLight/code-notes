@@ -34,6 +34,7 @@ def main():
     # 2. 配置 NebulaGraph 图数据库存储
     # ==========================================
     graph_store = NebulaPropertyGraphStore(
+        url=os.getenv("NEBULA_ADDRESS", "nebula://127.0.0.1:9669"),
         space="llamaindex_nebula_property_graph",
         overwrite=True
     )

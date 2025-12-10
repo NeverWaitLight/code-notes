@@ -149,9 +149,12 @@ cython_debug/
 *~
 .DS_Store
 
-.specstory/
-.cursorindexingignore
-.lingma/
-output/
+**/.specstory/
+**/.cursorindexingignore
+**/.lingma/
+**/output/
 
-poetry.lock
+**/poetry.lock
+**/logs/
+**/cache/
+**/output/

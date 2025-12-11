@@ -111,3 +111,170 @@ tail -f ./ragtest/logs/indexing-engine.log
 ```sh
 graphrag query --root ./test --method global --query "星期五之后听鲁滨逊说过些什么？"
 ```
+
+### 将 GraphRAG 数据导入 Neo4j
+
+使用 Cypher 和 APOC 库将 GraphRAG 生成的 parquet 文件导入到 Neo4j 数据库
+
+**前置条件**
+
+- 已安装并运行 Neo4j 数据库
+- 已构建 GraphRAG 索引（执行了 `graphrag index` 命令）
+- 已安装 APOC 插件
+
+**步骤一：准备 parquet 文件**
+
+将 GraphRAG 生成的 parquet 文件复制到 Neo4j 的 import 目录
+
+```sh
+# 找到 GraphRAG 输出目录中的 artifacts 文件夹
+# 通常位于 ./ragtest/output/*/artifacts/ 目录下
+# 将以下文件复制到 $NEO4J_HOME/import 目录：
+# - create_final_documents.parquet
+# - create_base_text_units.parquet
+# - create_final_nodes.parquet
+# - create_final_relationships.parquet
+# - create_final_communities.parquet
+# - create_final_community_reports.parquet
+
+cp ragtest/output/*/artifacts/*.parquet $NEO4J_HOME/import
+```
+
+**步骤二：配置 APOC 插件**
+
+启用 APOC 文件导入功能
+
+```sh
+# 在 $NEO4J_HOME/conf/apoc.conf 文件中添加以下配置
+echo 'apoc.import.file.enabled=true' >> $NEO4J_HOME/conf/apoc.conf
+```
+
+安装 APOC 插件到 Neo4j
+
+```sh
+cd $NEO4J_HOME/plugins
+
+# 如果存在 labs 目录，复制其中的 apoc jar 文件
+cp ../labs/*apoc*.jar .
+
+# 下载并安装 APOC 插件（根据 Neo4j 版本选择对应的 APOC 版本）
+curl -OL https://github.com/neo4j-contrib/neo4j-apoc-procedures/releases/download/5.21.0/apoc-5.21.0-extended.jar
+curl -OL https://github.com/neo4j-contrib/neo4j-apoc-procedures/releases/download/5.21.0/apoc-hadoop-dependencies-5.21.0-all.jar
+
+cd ..
+bin/neo4j restart
+```
+
+**步骤三：创建数据库约束**
+
+在 Neo4j 浏览器或 Cypher Shell 中执行以下约束创建语句
+
+```cypher
+create constraint chunk_id if not exists for (c:__Chunk__) require c.id is unique;
+create constraint document_id if not exists for (d:__Document__) require d.id is unique;
+create constraint entity_id if not exists for (c:__Community__) require c.community is unique;
+create constraint entity_id if not exists for (e:__Entity__) require e.id is unique;
+create constraint entity_title if not exists for (e:__Entity__) require e.title is unique;
+create constraint related_id if not exists for ()-[rel:RELATED]->() require rel.id is unique;
+```
+
+**步骤四：导入数据**
+
+在 Neo4j 浏览器或 Cypher Shell 中依次执行以下导入语句
+
+**导入文档（Documents）**
+
+```cypher
+call apoc.load.parquet("create_final_documents.parquet") yield value
+MERGE (d:__Document__ {id:value.id})
+SET d += value {.title, text_unit_ids:value.text_unit_ids, raw_content:substring(value.raw_content,0,1000)};
+```
+
+**导入文本块（Text Units/Chunks）**
+
+```cypher
+:auto
+call apoc.load.parquet("create_base_text_units.parquet") yield value
+CALL { with value
+MERGE (c:__Chunk__ {id:value.chunk_id})
+SET c += value {.chunk, .n_tokens}
+WITH *
+UNWIND value.document_ids as doc_id
+MATCH (d:__Document__ {id:doc_id})
+MERGE (d)<-[:PART_OF]-(c)
+RETURN count(distinct c) as chunksCreated
+} in transactions of 1000 rows
+RETURN sum(chunksCreated) as chunksCreated;
+```
+
+**导入实体节点（Entities/Nodes）**
+
+```cypher
+:auto
+call apoc.load.parquet("create_final_nodes.parquet") yield value
+call { with value
+    MERGE (n:__Entity__ {id:value.id})
+    SET n += value {.level, .top_level_node_id, .human_readable_id, .description,
+        title:replace(value.title,'"','')}
+    WITH n, value
+    CALL apoc.create.addLabels(n, case when value.type is null then [] else [apoc.text.upperCamelCase(replace(value.type,'"',''))] end) yield node
+    UNWIND split(value.source_id,",") as source_id
+    MATCH (c:__Chunk__ {id:source_id})
+    MERGE (c)-[:HAS_ENTITY]->(n)
+    RETURN count(distinct n) as created
+} in transactions of 25000 rows
+return sum(created) as createdNodes;
+```
+
+**导入关系（Relationships）**
+
+```cypher
+:auto
+call apoc.load.parquet("create_final_relationships.parquet") yield value
+call { with value
+    MATCH (source:__Entity__ {title:replace(value.source,'"','')})
+    MATCH (target:__Entity__ {title:replace(value.target,'"','')})
+    MERGE (source)-[rel:RELATED]->(target)
+    SET rel += value {.id, .rank, .weight, .human_readable_id, .description, text_unit_ids:value.text_unit_ids}
+    RETURN count(*) as created
+} in transactions of 25000 rows
+return sum(created) as createdRels;
+```
+
+**导入社区（Communities）**
+
+```cypher
+:auto
+call apoc.load.parquet("create_final_communities.parquet") yield value
+CALL { with value
+    MERGE (c:__Community__ {community:value.id})
+    SET c += value {.level, .title}
+    WITH *
+    UNWIND value.relationship_ids as rel_id
+    MATCH (start:__Entity__)-[:RELATED {id:rel_id}]->(end:__Entity__)
+    MERGE (start)-[:IN_COMMUNITY]->(c)
+    MERGE (end)-[:IN_COMMUNITY]->(c)
+    RETURn count(distinct c) as created
+} in transactions of 1000 rows
+RETURN sum(created) as createdCommunities;
+```
+
+**导入社区报告（Community Reports）**
+
+```cypher
+:auto
+call apoc.load.parquet("create_final_community_reports.parquet") yield value
+CALL { with value
+    MERGE (c:__Community__ {community:value.community})
+    SET c += value {.level, .title, .summary, .findings, .rank, .rank_explanation, .id}
+    RETURn count(distinct c) as created
+} in transactions of 1000 rows
+RETURN sum(created) as createdReports;
+```
+
+**注意事项**
+
+- `:auto` 前缀用于自动批处理，适合大数据量导入
+- `in transactions of N rows` 指定每批处理的行数，可根据数据量调整
+- 确保 Neo4j 数据库有足够的内存和磁盘空间
+- 导入过程中可以通过 Neo4j 浏览器监控进度

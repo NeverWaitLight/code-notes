@@ -142,12 +142,18 @@ cp ragtest/output/*/artifacts/*.parquet $NEO4J_HOME/import
 
 **步骤二：配置 APOC 插件**
 
-启用 APOC 文件导入功能
+检查 Neo4j 版本
 
 ```sh
-# 在 $NEO4J_HOME/conf/apoc.conf 文件中添加以下配置
-echo 'apoc.import.file.enabled=true' >> $NEO4J_HOME/conf/apoc.conf
+# 在 Neo4j 浏览器中执行以下查询查看版本
+# 或查看 $NEO4J_HOME/conf/neo4j.conf 文件
+# 或执行命令：bin/neo4j version
 ```
+
+根据 Neo4j 版本选择对应的 APOC 版本（APOC 版本应与 Neo4j 版本匹配）
+
+- Neo4j 5.x 使用 APOC 5.x
+- Neo4j 4.x 使用 APOC 4.x
 
 安装 APOC 插件到 Neo4j
 
@@ -158,12 +164,54 @@ cd $NEO4J_HOME/plugins
 cp ../labs/*apoc*.jar .
 
 # 下载并安装 APOC 插件（根据 Neo4j 版本选择对应的 APOC 版本）
+# 示例：Neo4j 5.21 使用 APOC 5.21.0
+# 访问 https://github.com/neo4j-contrib/neo4j-apoc-procedures/releases 查看所有版本
 curl -OL https://github.com/neo4j-contrib/neo4j-apoc-procedures/releases/download/5.21.0/apoc-5.21.0-extended.jar
 curl -OL https://github.com/neo4j-contrib/neo4j-apoc-procedures/releases/download/5.21.0/apoc-hadoop-dependencies-5.21.0-all.jar
 
 cd ..
+```
+
+启用 APOC 文件导入功能
+
+```sh
+# 检查 $NEO4J_HOME/conf/apoc.conf 文件是否存在，如果不存在则创建
+# 在 apoc.conf 文件中添加以下配置
+echo 'apoc.import.file.enabled=true' >> $NEO4J_HOME/conf/apoc.conf
+
+# 如果使用 Neo4j 5.x，可能还需要在 neo4j.conf 中添加：
+# dbms.security.procedures.unrestricted=apoc.*
+# dbms.security.procedures.allowlist=apoc.*
+```
+
+重启 Neo4j 服务
+
+```sh
 bin/neo4j restart
 ```
+
+验证 APOC 插件是否正确安装
+
+在 Neo4j 浏览器或 Cypher Shell 中执行以下查询验证 APOC 是否可用
+
+```cypher
+// 查看所有可用的 APOC 过程
+CALL dbms.procedures() YIELD name
+WHERE name STARTS WITH 'apoc'
+RETURN name
+ORDER BY name;
+
+// 或者测试 apoc.load.parquet 是否可用
+CALL apoc.help('load.parquet');
+```
+
+如果上述查询返回结果，说明 APOC 已正确安装。如果返回空结果或报错，请检查：
+
+1. 确认 jar 文件已正确放置在 `$NEO4J_HOME/plugins` 目录
+2. 确认 jar 文件权限正确（可读）
+3. 确认 Neo4j 版本与 APOC 版本匹配
+4. 检查 Neo4j 日志文件（`$NEO4J_HOME/logs/neo4j.log`）查看是否有加载错误
+5. 确认已重启 Neo4j 服务
 
 **步骤三：创建数据库约束**
 

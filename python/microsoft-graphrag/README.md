@@ -86,7 +86,7 @@ models:
 embed_text:
   model_id: default_embedding_model
   vector_store_id: default_vector_store
-  batch_size: 8 # 新增这个配置，阿里百炼不支持过高的批处理size
+  batch_size: 4 # 新增这个配置，阿里百炼不支持过高的批处理size
 ```
 
 **修改 .env**

@@ -200,116 +200,212 @@ CALL apoc.help('load.parquet');
 4. 检查 Neo4j 日志文件（`$NEO4J_HOME/logs/neo4j.log`）查看是否有加载错误
 5. 确认已重启 Neo4j 服务
 
-**步骤三：创建数据库约束**
+将 GraphRAG 生成的 Parquet 文件导入 Neo4j 是一个很好的选择，可以让你利用图数据库强大的查询和可视化功能。
 
-在 Neo4j 浏览器或 Cypher Shell 中执行以下约束创建语句
+要使用 `apoc.load.parquet`，你需要确保 Neo4j 已经安装了 **APOC** 插件，并且相关的 Parquet 依赖库（通常包含在 `apoc-extended` 中，或者是较新版本的标准库中）已就绪。
 
-```cypher
-create constraint chunk_id if not exists for (c:__Chunk__) require c.id is unique;
-create constraint document_id if not exists for (d:__Document__) require d.id is unique;
-create constraint entity_id if not exists for (c:__Community__) require c.community is unique;
-create constraint entity_id if not exists for (e:__Entity__) require e.id is unique;
-create constraint entity_title if not exists for (e:__Entity__) require e.title is unique;
-create constraint related_id if not exists for ()-[rel:RELATED]->() require rel.id is unique;
-```
+以下是分步骤的 Cypher 导入脚本。
 
-**步骤四：导入数据**
+### 0. 准备工作：设置约束和索引
 
-在 Neo4j 浏览器或 Cypher Shell 中依次执行以下导入语句
-
-**导入文档（Documents）**
+在导入数据之前，必须先建立索引，以加快匹配速度并确保数据唯一性。
 
 ```cypher
-call apoc.load.parquet("create_final_documents.parquet") yield value
-MERGE (d:__Document__ {id:value.id})
-SET d += value {.title, text_unit_ids:value.text_unit_ids, raw_content:substring(value.raw_content,0,1000)};
+// Documents: 使用 id 作为唯一键
+CREATE CONSTRAINT document_id IF NOT EXISTS FOR (d:Document) REQUIRE d.id IS UNIQUE;
+
+// TextUnits: 使用 id 作为唯一键
+CREATE CONSTRAINT text_unit_id IF NOT EXISTS FOR (t:TextUnit) REQUIRE t.id IS UNIQUE;
+
+// Entities: 使用 id 作为唯一键，同时为 title (名称) 创建索引以便建立关系
+CREATE CONSTRAINT entity_id IF NOT EXISTS FOR (e:Entity) REQUIRE e.id IS UNIQUE;
+CREATE INDEX entity_title IF NOT EXISTS FOR (e:Entity) ON (e.title);
+
+// Communities: 使用 id 作为唯一键，同时为 community (整数ID) 创建索引用于层级关联
+CREATE CONSTRAINT community_id IF NOT EXISTS FOR (c:Community) REQUIRE c.id IS UNIQUE;
+CREATE INDEX community_int_id IF NOT EXISTS FOR (c:Community) ON (c.community);
+
+// CommunityReports: 使用 id 作为唯一键
+CREATE CONSTRAINT report_id IF NOT EXISTS FOR (r:CommunityReport) REQUIRE r.id IS UNIQUE;
+
+// Covariates (如果存在): 使用 id 作为唯一键
+CREATE CONSTRAINT covariate_id IF NOT EXISTS FOR (cov:Covariate) REQUIRE cov.id IS UNIQUE;
 ```
 
-**导入文本块（Text Units/Chunks）**
+---
+
+### 1. 导入 Documents (文档)
+
+**文件:** `documents.parquet`
 
 ```cypher
-:auto
-call apoc.load.parquet("create_base_text_units.parquet") yield value
-CALL { with value
-MERGE (c:__Chunk__ {id:value.chunk_id})
-SET c += value {.chunk, .n_tokens}
-WITH *
-UNWIND value.document_ids as doc_id
-MATCH (d:__Document__ {id:doc_id})
-MERGE (d)<-[:PART_OF]-(c)
-RETURN count(distinct c) as chunksCreated
-} in transactions of 1000 rows
-RETURN sum(chunksCreated) as chunksCreated;
+CALL apoc.load.parquet('file:///documents.parquet') YIELD value
+MERGE (d:Document {id: value.id})
+SET d.title = value.title,
+    d.text = value.text,
+    d.human_readable_id = value.human_readable_id;
 ```
 
-**导入实体节点（Entities/Nodes）**
+---
+
+### 2. 导入 TextUnits (文本块) 并关联 Documents
+
+**文件:** `text_units.parquet`
+_逻辑：创建 TextUnit 节点，解析 `document_ids` 数组并建立与 Document 的 `PART_OF` 关系。_
 
 ```cypher
-:auto
-call apoc.load.parquet("create_final_nodes.parquet") yield value
-call { with value
-    MERGE (n:__Entity__ {id:value.id})
-    SET n += value {.level, .top_level_node_id, .human_readable_id, .description,
-        title:replace(value.title,'"','')}
-    WITH n, value
-    CALL apoc.create.addLabels(n, case when value.type is null then [] else [apoc.text.upperCamelCase(replace(value.type,'"',''))] end) yield node
-    UNWIND split(value.source_id,",") as source_id
-    MATCH (c:__Chunk__ {id:source_id})
-    MERGE (c)-[:HAS_ENTITY]->(n)
-    RETURN count(distinct n) as created
-} in transactions of 25000 rows
-return sum(created) as createdNodes;
+CALL apoc.load.parquet('file:///text_units.parquet') YIELD value
+MERGE (t:TextUnit {id: value.id})
+SET t.text = value.text,
+    t.n_tokens = value.n_tokens,
+    t.human_readable_id = value.human_readable_id
+
+// 建立 TextUnit -> Document 的关系
+WITH t, value
+UNWIND value.document_ids AS docId
+MATCH (d:Document {id: docId})
+MERGE (t)-[:PART_OF]->(d);
 ```
 
-**导入关系（Relationships）**
+---
+
+### 3. 导入 Entities (实体) 并关联 TextUnits
+
+**文件:** `entities.parquet`
+_逻辑：创建实体节点，并根据 `text_unit_ids` 建立与 TextUnit 的关系（表示实体出现在哪些文本块中）。_
 
 ```cypher
-:auto
-call apoc.load.parquet("create_final_relationships.parquet") yield value
-call { with value
-    MATCH (source:__Entity__ {title:replace(value.source,'"','')})
-    MATCH (target:__Entity__ {title:replace(value.target,'"','')})
-    MERGE (source)-[rel:RELATED]->(target)
-    SET rel += value {.id, .rank, .weight, .human_readable_id, .description, text_unit_ids:value.text_unit_ids}
-    RETURN count(*) as created
-} in transactions of 25000 rows
-return sum(created) as createdRels;
+CALL apoc.load.parquet('file:///entities.parquet') YIELD value
+MERGE (e:Entity {id: value.id})
+SET e.title = value.title,
+    e.type = value.type,
+    e.description = value.description,
+    e.frequency = value.frequency,
+    e.degree = value.degree,
+    e.human_readable_id = value.human_readable_id,
+    // 只有在 UMAP 开启时才有 x/y 坐标
+    e.x = value.x,
+    e.y = value.y
+
+// 建立 Entity -> TextUnit 的关系 (APPEARS_IN)
+WITH e, value
+UNWIND value.text_unit_ids AS textUnitId
+MATCH (t:TextUnit {id: textUnitId})
+MERGE (e)-[:APPEARS_IN]->(t);
 ```
 
-**导入社区（Communities）**
+---
+
+### 4. 导入 Relationships (实体关系图)
+
+**文件:** `relationships.parquet`
+_逻辑：这是核心图谱。注意 GraphRAG 的 parquet 中 source/target 字段通常是实体的 **名称 (title)** 而不是 ID。_
 
 ```cypher
-:auto
-call apoc.load.parquet("create_final_communities.parquet") yield value
-CALL { with value
-    MERGE (c:__Community__ {community:value.id})
-    SET c += value {.level, .title}
-    WITH *
-    UNWIND value.relationship_ids as rel_id
-    MATCH (start:__Entity__)-[:RELATED {id:rel_id}]->(end:__Entity__)
-    MERGE (start)-[:IN_COMMUNITY]->(c)
-    MERGE (end)-[:IN_COMMUNITY]->(c)
-    RETURn count(distinct c) as created
-} in transactions of 1000 rows
-RETURN sum(created) as createdCommunities;
+CALL apoc.load.parquet('file:///relationships.parquet') YIELD value
+MATCH (source:Entity {title: value.source})
+MATCH (target:Entity {title: value.target})
+MERGE (source)-[r:RELATED]->(target)
+SET r.description = value.description,
+    r.weight = value.weight,
+    r.id = value.id,
+    r.human_readable_id = value.human_readable_id,
+    r.text_unit_ids = value.text_unit_ids; // 可选：将来源文本块ID存为属性
 ```
 
-**导入社区报告（Community Reports）**
+---
+
+### 5. 导入 Communities (社区)
+
+**文件:** `communities.parquet`
+_逻辑：创建社区节点，包含实体的成员关系，以及社区之间的父子层级关系。_
 
 ```cypher
-:auto
-call apoc.load.parquet("create_final_community_reports.parquet") yield value
-CALL { with value
-    MERGE (c:__Community__ {community:value.community})
-    SET c += value {.level, .title, .summary, .findings, .rank, .rank_explanation, .id}
-    RETURn count(distinct c) as created
-} in transactions of 1000 rows
-RETURN sum(created) as createdReports;
+CALL apoc.load.parquet('file:///communities.parquet') YIELD value
+MERGE (c:Community {id: value.id})
+SET c.community = value.community,
+    c.level = value.level,
+    c.title = value.title,
+    c.period = value.period,
+    c.size = value.size,
+    c.human_readable_id = value.human_readable_id
+
+// 1. 建立 Community -> Entity 的成员关系 (IN_COMMUNITY)
+// 注意：GraphRAG 输出的 entity_ids 通常是 Entity 的 id (UUID)
+WITH c, value
+UNWIND value.entity_ids AS entityId
+MATCH (e:Entity {id: entityId})
+MERGE (e)-[:IN_COMMUNITY]->(c);
+
+// 2. (可选) 再次运行以建立社区层级关系 (PARENT_OF)
+// 由于父节点可能还没导入，建议用两个独立的事务或 apoc.periodic.iterate，这里展示简化版
+CALL apoc.load.parquet('file:///communities.parquet') YIELD value
+MATCH (child:Community {id: value.id})
+WHERE value.parent IS NOT NULL
+MATCH (parent:Community {community: value.parent})
+MERGE (parent)-[:PARENT_OF]->(child);
 ```
 
-**注意事项**
+---
 
-- `:auto` 前缀用于自动批处理，适合大数据量导入
-- `in transactions of N rows` 指定每批处理的行数，可根据数据量调整
-- 确保 Neo4j 数据库有足够的内存和磁盘空间
-- 导入过程中可以通过 Neo4j 浏览器监控进度
+### 6. 导入 Community Reports (社区报告)
+
+**文件:** `community_reports.parquet`
+_逻辑：导入报告并将其连接到对应的社区节点。关联键是 `community` (整数 ID)。_
+
+```cypher
+CALL apoc.load.parquet('file:///community_reports.parquet') YIELD value
+MERGE (r:CommunityReport {id: value.id})
+SET r.title = value.title,
+    r.summary = value.summary,
+    r.full_content = value.full_content,
+    r.rank = value.rank,
+    r.rating_explanation = value.rating_explanation,
+    r.human_readable_id = value.human_readable_id
+
+// 关联到 Community 节点
+WITH r, value
+MATCH (c:Community {community: value.community})
+MERGE (r)-[:REPORT_FOR]->(c);
+```
+
+---
+
+### 7. (可选) 导入 Covariates (协变量/声明)
+
+**文件:** `covariates.parquet`
+_逻辑：如果有声明提取（Claim extraction），导入这些数据并连接到涉及的实体。_
+
+```cypher
+CALL apoc.load.parquet('file:///covariates.parquet') YIELD value
+MERGE (cov:Covariate {id: value.id})
+SET cov.type = value.type,
+    cov.description = value.description,
+    cov.status = value.status,
+    cov.start_date = value.start_date,
+    cov.end_date = value.end_date,
+    cov.source_text = value.source_text
+
+// 关联 Subject 实体 (根据名称匹配)
+WITH cov, value
+MATCH (s:Entity {title: value.subject_id})
+MERGE (s)-[:HAS_CLAIM_SUBJECT]->(cov)
+
+// 关联 Object 实体 (根据名称匹配)
+WITH cov, value
+MATCH (o:Entity {title: value.object_id})
+MERGE (o)-[:HAS_CLAIM_OBJECT]->(cov);
+```
+
+### 注意事项：
+
+1.  **文件路径**：请将 `file:///documents.parquet` 替换为你实际的文件路径。如果文件在 Neo4j 的 `import` 目录下，直接使用文件名即可；如果在其他位置，需要配置 `apoc.import.file.use_neo4j_config=false` 并使用绝对路径。
+2.  **内存管理**：如果你的 Parquet 文件非常大（百万级节点），直接 `CALL` 可能会导致内存溢出。建议结合 `apoc.periodic.iterate` 使用。例如：
+    ```cypher
+    CALL apoc.periodic.iterate(
+      "CALL apoc.load.parquet('file:///relationships.parquet') YIELD value RETURN value",
+      "MATCH (s:Entity {title: value.source}) MATCH (t:Entity {title: value.target}) MERGE (s)-[:RELATED]->(t) ...",
+      {batchSize: 1000, parallel: false}
+    )
+    ```
+3.  **匹配键**：GraphRAG 输出的 `relationships` 表明确说明 `source` 和 `target` 是名称（Name），而 `text_units` 和 `communities` 中的列表通常是 ID（UUID）。如果发现关系建立失败，请检查 Parquet 数据中该字段存储的是 ID 还是 Name。

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>tracking.js - face with camera</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tracking.js/1.1.3/tracking-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tracking.js/1.1.3/data/face-min.js"></script>
+
+    <style>
+        #video,
+        #canvas {
+            position: absolute;
+        }
+
+        #snapshotCanvas {
+            visibility: hidden;
+        }
+
+        .container {
+            display: flex;
+        }
+
+        .preview-container {
+            flex: 1;
+        }
+
+        .photos-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+    </style>
+</head>
+
+<body>
+<div class="title">
+    <p><a href="http://trackingjs.com" target="_parent">tracking.js</a> － get user's webcam and detect faces</p>
+</div>
+
+<div class="container">
+    <div class="preview-container">
+        <video id="video" width="640" height="480" preload autoplay loop muted></video>
+        <canvas id="canvas" width="640" height="480"></canvas>
+    </div>
+    <canvas id="snapshotCanvas" width="100" height="100"></canvas>
+    <div class="photos-container">
+        <div id="photos"></div>
+    </div>
+</div>
+
+<script>
+    var video = document.getElementById('video');
+    var canvas = document.getElementById('canvas');
+    var snapshotCanvas = document.getElementById('snapshotCanvas');
+    var photos = document.getElementById('photos');
+    var lastInsertTime = null;
+
+    // getUserMedia 获取摄像头画面
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(function (stream) {
+            video.srcObject = stream;
+            video.play();
+        });
+
+    // 在摄像头画面中检测人脸
+    var tracker = new tracking.ObjectTracker('face');
+    tracker.setInitialScale(4);
+    tracker.setStepSize(2);
+    tracker.setEdgesDensity(0.1);
+
+    tracking.track('#video', tracker, { camera: true });
+
+    // 监听人脸检测到事件
+    // Source blog: https://stackoverflow.com/questions/33885457/adding-auto-capture-on-face-detection-using-tracking-js
+    var context = canvas.getContext('2d');
+    tracker.on('track', function (event) {
+        context.clearRect(0, 0, canvas.width, canvas.height);
+
+        const video = document.getElementById('video');
+
+        // 获取视频原始大小，以匹配裁剪
+        video.addEventListener('loadedmetadata', () => {
+            const originalWidth = video.videoWidth;
+            const originalHeight = video.videoHeight;
+            console.log(`Original resolution: ${originalWidth}x${originalHeight}`);
+        });
+
+        var currentTime = new Date();
+        event.data.forEach(function (rect) {
+            context.strokeStyle = '#00ff00';
+            context.strokeRect(rect.x, rect.y, rect.width, rect.height);
+
+            if (lastInsertTime == null || (currentTime - lastInsertTime) >= 3000) {
+                var snapshotContext = snapshotCanvas.getContext('2d');
+                snapshotContext.drawImage(video, rect.x, rect.y, rect.width, rect.height,
+                    0, 0, snapshotCanvas.width, snapshotCanvas.height);
+                var dataURI = snapshotCanvas.toDataURL('image/png');
+                var img = document.createElement('img');
+                img.src = dataURI;
+                photos.insertBefore(img, photos.firstChild);
+                lastInsertTime = currentTime;
+            }
+        });
+    });
+</script>
+</body>
+
+</html>

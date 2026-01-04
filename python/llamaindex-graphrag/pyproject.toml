@@ -1,0 +1,22 @@
+[project]
+name = "llamaindex-graphrag"
+version = "0.1.0"
+requires-python = ">=3.13,<4.0"
+dependencies = [
+    "llama-index (>=0.14.9,<0.15.0)",
+    "llama-index-embeddings-huggingface (>=0.6.1,<0.7.0)",
+    "llama-index-llms-deepseek (>=0.2.2,<0.3.0)",
+    "llama-index-graph-stores-neo4j (>=0.5.1,<0.6.0)",
+    "llama-index-graph-stores-nebula (>=0.5.1,<0.6.0)",
+    "jupyter-nebulagraph (>=0.14.3,<0.15.0)",
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[[tool.poetry.source]]
+name = "tuna"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple/"
+priority = "primary"

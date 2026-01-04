@@ -1,0 +1,28 @@
+server:
+  port: 45010
+spring:
+  application:
+    name: business
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+        group: TCC
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/tcc_business
+    username: root
+    password: 123456
+# seata client
+seata:
+  enable-auto-data-source-proxy: false
+  tx-service-group: my-tcc-tx-group
+  service:
+    vgroup-mapping:
+      my-tcc-tx-group: default
+  registry:
+    type: nacos
+    nacos:
+      application: seata-server
+      server-addr: 127.0.0.1:8848
+      group: SEATA_GROUP

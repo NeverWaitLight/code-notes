@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>tracking.js - face with camera</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tracking.js/1.1.3/tracking-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tracking.js/1.1.3/data/face-min.js"></script>
+
+    <style>
+        #canvas {
+            position: absolute;
+        }
+    </style>
+</head>
+
+<body>
+<div class="title">
+    <p><a href="http://trackingjs.com" target="_parent">tracking.js</a> － get user's webcam and detect faces</p>
+</div>
+
+<canvas id="canvas" width="360" height="480"></canvas>
+
+<script>
+    var video = document.createElement('video');
+    var canvas = document.getElementById('canvas');
+    var context = canvas.getContext('2d');
+
+    // 在摄像头画面中检测人脸
+    var tracker = new tracking.ObjectTracker('face');
+    tracker.setInitialScale(4);
+    tracker.setStepSize(2);
+    tracker.setEdgesDensity(0.1);
+
+    // getUserMedia 获取摄像头画面
+    navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+            video.play();
+            setInterval(() => {
+                context.drawImage(video, 140, 0, 360, 480, 0, 0, 360, 480);
+                tracking.track(canvas, tracker);
+            }, 16.7); // 60fps
+        }
+    });
+
+    tracker.on('track', function (event) {
+        event.data.forEach(function (rect) {
+            context.strokeStyle = '#00ff00';
+            context.strokeRect(rect.x, rect.y, rect.width, rect.height);
+        });
+    });
+</script>
+</body>
+
+</html>

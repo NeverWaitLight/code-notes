@@ -1,0 +1,18 @@
+[project]
+name = "rag-eval"
+version = "0.1.0"
+description = "RAG evaluation project using ragas"
+requires-python = ">=3.10"
+dependencies = [
+    "ragas==0.4.2",
+    "openai>=1.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pip]
+index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+trusted-host = "pypi.tuna.tsinghua.edu.cn"
+

@@ -1,0 +1,19 @@
+server:
+  port: 8081
+
+xxl:
+  job:
+    admin:
+      addresses: http://localhost:8080/xxl-job-admin
+    accessToken: default_token #xxl-job-admin默认token
+    executor:
+      appname: xxl-job-demo
+      ip: ""
+      port: 9999
+      logpath: /data/applogs/xxl-job/jobhandler
+      logretentiondays: 30
+      job:
+        addRandomNumbersJob:
+          cron: "0 0/1 * * * ?"
+          desc: "每分钟执行随机数相加任务"
+          author: "admin"

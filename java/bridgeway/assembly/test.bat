@@ -1,0 +1,1 @@
+"%~dp0jre\bin\javaw" -jar "%~dp0lib\yl-client-plugin.jar"

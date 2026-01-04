@@ -1,0 +1,27 @@
+server:
+  port: 65011
+spring:
+  application:
+    name: order
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/at_order
+    username: root
+    password: 123456
+# seata client
+seata:
+  tx-service-group: my-at-tx-group
+  service:
+    vgroup-mapping:
+      my-at-tx-group:
+        default
+  registry:
+    type: nacos
+    nacos:
+      application: seata-server
+      server-addr: 127.0.0.1:8848
+      group: SEATA_GROUP

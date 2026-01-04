@@ -24,7 +24,7 @@ class Config:
     RAG_PROJECT_ID = "chat_2005845271228973056"
     RAG_TIMEOUT = 99999999999999999999.0
     RAG_TOP_K = 10
-    RAG_USE_RANKER = True
+    RAG_USE_RANKER = False
     RAG_SCORE_THRESHOLD = None
 
     @classmethod

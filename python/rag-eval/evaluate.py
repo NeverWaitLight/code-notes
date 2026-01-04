@@ -5,6 +5,8 @@ RAG评估脚本
 """
 
 import asyncio
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict
 
 from openai import AsyncOpenAI
@@ -197,6 +199,105 @@ def setup_evaluation(rag_client: RAGClient) -> None:
     _global_rag_client = rag_client
 
 
+def escape_markdown(text: str) -> str:
+    """
+    转义Markdown特殊字符
+
+    参数:
+        text: 需要转义的文本
+
+    返回:
+        转义后的文本
+    """
+    return text.replace("|", "\\|").replace("\n", "<br>").replace("\r", "")
+
+
+def save_results_to_markdown(
+    results: list[ExperimentResult],
+    dataset_items: list,
+    output_dir: str = "experiments",
+) -> Path:
+    """
+    将评估结果保存到Markdown文件
+
+    参数:
+        results: 评估结果列表
+        dataset_items: 数据集项列表
+        output_dir: 输出目录，默认为experiments
+
+    返回:
+        保存的Markdown文件路径
+    """
+    output_path = Path(output_dir)
+    output_path.mkdir(exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    md_filename = f"{timestamp}-evaluation_results.md"
+    md_path = output_path / md_filename
+
+    headers = [
+        "序号",
+        "查询",
+        "Context Relevance",
+        "检索到的上下文数量",
+        "上下文1",
+        "上下文2",
+        "上下文3",
+        "上下文4",
+        "上下文5",
+    ]
+
+    with open(md_path, "w", encoding="utf-8") as f:
+        f.write("# RAG评估结果\n\n")
+        f.write(f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        f.write("## 评估结果表格\n\n")
+
+        header_row = "| " + " | ".join(headers) + " |\n"
+        separator_row = "| " + " | ".join(["---"] * len(headers)) + " |\n"
+
+        f.write(header_row)
+        f.write(separator_row)
+
+        for i, result in enumerate(results):
+            item = dataset_items[i]
+            if isinstance(item, dict):
+                user_input = item.get("user_input", f"样本 {i + 1}")
+            else:
+                user_input = getattr(item, "user_input", f"样本 {i + 1}")
+
+            contexts = result.retrieved_contexts[:5]
+            row_values = [
+                str(i + 1),
+                escape_markdown(user_input),
+                f"{result.context_relevance:.4f}",
+                str(len(result.retrieved_contexts)),
+            ]
+
+            for j in range(5):
+                if j < len(contexts):
+                    context_text = (
+                        contexts[j][:200] + "..."
+                        if len(contexts[j]) > 200
+                        else contexts[j]
+                    )
+                    row_values.append(escape_markdown(context_text))
+                else:
+                    row_values.append("")
+
+            row = "| " + " | ".join(row_values) + " |\n"
+            f.write(row)
+
+        if results:
+            avg_context_relevance = sum(r.context_relevance for r in results) / len(
+                results
+            )
+            f.write("\n## 统计信息\n\n")
+            f.write(f"- **总样本数**: {len(results)}\n")
+            f.write(f"- **平均 Context Relevance**: {avg_context_relevance:.4f}\n")
+
+    return md_path
+
+
 async def main():
     """
     主函数
@@ -239,6 +340,10 @@ async def main():
         print("\n" + "=" * 80)
         print("平均分数:")
         print(f"  Context Relevance: {avg_context_relevance:.4f}")
+
+    # 保存结果到Markdown
+    md_path = save_results_to_markdown(results, dataset_items)
+    print(f"\n结果已保存到Markdown文件: {md_path.absolute()}")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,0 @@
-query,expected_output,response,accuracy
-Who developed the theory of relativity?,Einstein,Blue Whale,fail
-What is 2 + 2?,4,Python,fail
-What programming language is named after a snake?,Python,Einstein,fail
-What is the capital of France?,Paris,Paris,pass
-What is the largest animal?,Blue Whale,Blue Whale,pass

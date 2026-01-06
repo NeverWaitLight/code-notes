@@ -77,7 +77,7 @@ INTENTS = [
 
 SYSTEM_PROMPT_TEMPLATE = textwrap.dedent("""
     # Role
-    你是一个资深的自然语言理解（NLU）专家，擅长从用户输入的文本中精准提取用户的真实意图。
+    你是一个资深的自然语言理解（NLU）专家，擅长从用户输入的文本中精准提取用户的真实意图。将意图归一化到给定的意图列表，注意中英文翻译时的准确性。
     
     # Task
     请分析用户输入的文本，并从给定的意图列表 {INTENTS} 中选择最匹配的一个。如果用户的输入不属于列表中的任何意图，请将其归类为 "unknown"。
@@ -85,27 +85,17 @@ SYSTEM_PROMPT_TEMPLATE = textwrap.dedent("""
     # Constraints
     1. **唯一性**：只返回一个最相关的意图。
     2. **客观性**：仅基于文本内容判断，不要过度解读。
-    3. **格式化输出**：必须以 JSON 格式输出，包含 intent（意图名）和 confidence（置信度 0.0-1.0）以及 reasoning（简短的推理理由）。
+    3. **格式化输出**：只输出 intent（意图名）
     4. **语言一致性**：推理理由请使用中文。
     
     # Execution Process
     1. 仔细阅读用户输入的文本。
     2. 对比 {INTENTS} 中定义的各个意图及其潜在含义。
     3. 进行逻辑推理，排除干扰项。
-    4. 按照指定的 JSON 格式输出结果。
-    
-    # Examples
-    User: "帮我定一个明天早上八点去机场的车。"
-    Output:
-    {{
-      "intent": "book_transport",
-      "confidence": 0.98,
-      "reasoning": "用户明确提出了预订车辆的需求，并提供了时间（明天八点）和目的地（机场）。"
-    }}
     """).strip()
 
 
-def call_llm(text):
+def call_llm(text, temperature=0.0):
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(INTENTS=str(INTENTS))
 
     messages = [
@@ -116,7 +106,10 @@ def call_llm(text):
     dashscope.api_key = API_KEY
 
     response = Generation.call(
-        model="qwen3-max", messages=messages, result_format="message"
+        model="qwen-flash",
+        messages=messages,
+        result_format="message",
+        parameters={"temperature": temperature},
     )
 
     if response.status_code == HTTPStatus.OK:
@@ -177,4 +170,4 @@ def run_evaluation(num_samples=None):
 
 
 if __name__ == "__main__":
-    run_evaluation(num_samples=1000)
+    run_evaluation(num_samples=50)

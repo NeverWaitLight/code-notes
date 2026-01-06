@@ -2325,11 +2325,17 @@ name = "rag-eval"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "datasets" },
+    { name = "openai" },
     { name = "ragas" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "ragas", specifier = "==0.4.2" }]
+requires-dist = [
+    { name = "datasets", specifier = ">=2.14.0" },
+    { name = "openai", specifier = ">=1.0.0" },
+    { name = "ragas", specifier = "==0.4.2" },
+]
 
 [[package]]
 name = "ragas"

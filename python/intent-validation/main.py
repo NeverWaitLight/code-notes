@@ -1,4 +1,6 @@
+import logging
 import textwrap
+from collections import defaultdict
 from http import HTTPStatus
 
 import dashscope
@@ -7,11 +9,21 @@ from datasets import load_dataset
 from sklearn.metrics import accuracy_score, classification_report
 from tqdm import tqdm
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler("evaluation.log", encoding="utf-8"),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger(__name__)
+
 API_KEY = "sk-a4e10b09167d48f686eca678dedd4dd6"
 
-# 1. 加载数据集 (使用验证集 validation)
-print("正在加载数据集...")
+logger.info("正在加载数据集...")
 dataset = load_dataset("SetFit/amazon_massive_intent_zh-CN", split="validation")
+logger.info(f"数据集加载完成，共 {len(dataset)} 条样本")
 
 INTENTS = [
     "calendar_remove",
@@ -82,6 +94,9 @@ SYSTEM_PROMPT_TEMPLATE = textwrap.dedent("""
     # Task
     请分析用户输入的文本，并从给定的意图列表 {INTENTS} 中选择最匹配的一个。如果用户的输入不属于列表中的任何意图，请将其归类为 "unknown"。
     
+    # Few-Shot Examples
+    {FEW_SHOT_EXAMPLES}
+    
     # Constraints
     1. **唯一性**：只返回一个最相关的意图。
     2. **客观性**：仅基于文本内容判断，不要过度解读。
@@ -90,13 +105,55 @@ SYSTEM_PROMPT_TEMPLATE = textwrap.dedent("""
     
     # Execution Process
     1. 仔细阅读用户输入的文本。
-    2. 对比 {INTENTS} 中定义的各个意图及其潜在含义。
-    3. 进行逻辑推理，排除干扰项。
+    2. 参考上面的示例，理解不同意图的表达方式。
+    3. 对比 {INTENTS} 中定义的各个意图及其潜在含义。
+    4. 进行逻辑推理，排除干扰项。
     """).strip()
 
 
-def call_llm(text, temperature=0.0):
-    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(INTENTS=str(INTENTS))
+def extract_few_shot_examples(dataset, intents, max_total_examples=20):
+    """
+    从数据集中提取示例用于few-shot learning，总数限制为max_total_examples
+    """
+    intent_examples = defaultdict(list)
+    total_count = 0
+    max_total = max_total_examples
+
+    # 先为每个意图收集至少1个示例（如果可能）
+    for item in dataset:
+        if total_count >= max_total:
+            break
+        intent = item["label_text"]
+        if intent in intents and len(intent_examples[intent]) == 0:
+            intent_examples[intent].append(item["text"])
+            total_count += 1
+
+    # 继续收集直到达到总数限制
+    for item in dataset:
+        if total_count >= max_total:
+            break
+        intent = item["label_text"]
+        if intent in intents and len(intent_examples[intent]) < 2:
+            intent_examples[intent].append(item["text"])
+            total_count += 1
+
+    few_shot_text = "以下是各意图的示例：\n\n"
+    for intent in intents:
+        if intent in intent_examples and intent_examples[intent]:
+            few_shot_text += f"意图: {intent}\n"
+            for example in intent_examples[intent]:
+                few_shot_text += f"  示例: {example}\n"
+            few_shot_text += "\n"
+
+    actual_count = sum(len(v) for v in intent_examples.values())
+    logger.info(f"已提取 {actual_count} 个few-shot示例（限制: {max_total}）")
+    return few_shot_text
+
+
+def call_llm(text, few_shot_examples="", temperature=0.0):
+    system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
+        INTENTS=str(INTENTS), FEW_SHOT_EXAMPLES=few_shot_examples
+    )
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -105,17 +162,20 @@ def call_llm(text, temperature=0.0):
 
     dashscope.api_key = API_KEY
 
+    logger.debug(f"调用LLM，输入文本: {text[:50]}...")
     response = Generation.call(
-        model="qwen-flash",
+        model="deepseek-v3.2",
         messages=messages,
         result_format="message",
         parameters={"temperature": temperature},
     )
 
     if response.status_code == HTTPStatus.OK:
-        return response.output.choices[0].message["content"]
+        result = response.output.choices[0].message["content"]
+        logger.debug(f"LLM返回结果: {result}")
+        return result
     else:
-        print(f"请求失败: {response.message}")
+        logger.error(f"请求失败: {response.message}")
         return "unknown"
 
 
@@ -133,41 +193,69 @@ def clean_output(output, intent_list):
 
 
 # 4. 执行验证逻辑
-def run_evaluation(num_samples=None):
+def run_evaluation(num_samples=None, max_few_shot_examples=20):
     # 获取所有唯一的意图标签列表
     all_intents = list(set(dataset["label_text"]))
+    logger.info(f"数据集中共有 {len(all_intents)} 个不同的意图")
+
+    # 提取few-shot示例
+    logger.info("正在从数据集中提取few-shot示例...")
+    few_shot_examples = extract_few_shot_examples(
+        dataset, INTENTS, max_few_shot_examples
+    )
+    logger.info("Few-shot示例提取完成")
 
     y_true = []
     y_pred = []
 
     if num_samples is None:
         test_subset = dataset
-        print(f"开始测试完整数据集，共 {len(dataset)} 条样本...")
+        logger.info(f"开始测试完整数据集，共 {len(dataset)} 条样本...")
     else:
         test_subset = dataset.select(range(min(num_samples, len(dataset))))
-        print(f"开始测试 {len(test_subset)} 条样本...")
+        logger.info(f"开始测试 {len(test_subset)} 条样本...")
 
-    for item in tqdm(test_subset):
+    correct_count = 0
+    for idx, item in enumerate(tqdm(test_subset, desc="评估进度")):
         input_text = item["text"]
         true_label = item["label_text"]
 
         # 获取 Agent 输出
-        raw_output = call_llm(input_text)
+        raw_output = call_llm(input_text, few_shot_examples)
 
         # 清理输出
         predicted_label = clean_output(raw_output, all_intents)
+
+        is_correct = predicted_label == true_label
+        if is_correct:
+            correct_count += 1
+
+        logger.debug(
+            f"样本 {idx + 1}: 真实={true_label}, 预测={predicted_label}, "
+            f"正确={'✓' if is_correct else '✗'}"
+        )
 
         y_true.append(true_label)
         y_pred.append(predicted_label)
 
     # 5. 输出评估报告
+    accuracy = accuracy_score(y_true, y_pred)
+    logger.info("\n" + "=" * 30)
+    logger.info("评估完成！报告如下：")
+    logger.info(f"准确率 (Accuracy): {accuracy:.2%}")
+    logger.info(f"正确样本数: {correct_count}/{len(y_true)}")
+    logger.info("\n详细分类指标:")
+    # zero_division=0 处理 Agent 预测出数据集以外标签的情况
+    report = classification_report(y_true, y_pred, zero_division=0)
+    logger.info(f"\n{report}")
+
     print("\n" + "=" * 30)
     print("评估完成！报告如下：")
-    print(f"准确率 (Accuracy): {accuracy_score(y_true, y_pred):.2%}")
+    print(f"准确率 (Accuracy): {accuracy:.2%}")
+    print(f"正确样本数: {correct_count}/{len(y_true)}")
     print("\n详细分类指标:")
-    # zero_division=0 处理 Agent 预测出数据集以外标签的情况
-    print(classification_report(y_true, y_pred, zero_division=0))
+    print(report)
 
 
 if __name__ == "__main__":
-    run_evaluation(num_samples=50)
+    run_evaluation(num_samples=50, max_few_shot_examples=20)

@@ -114,28 +114,40 @@ SYSTEM_PROMPT_TEMPLATE = textwrap.dedent("""
 def extract_few_shot_examples(dataset, intents, max_total_examples=20):
     """
     从数据集中提取示例用于few-shot learning，总数限制为max_total_examples
+    确保每个意图至少有一个示例，且所有示例文本都不重复
     """
     intent_examples = defaultdict(list)
+    used_texts = set()
     total_count = 0
     max_total = max_total_examples
 
-    # 先为每个意图收集至少1个示例（如果可能）
+    # 第一阶段：为每个意图收集至少1个唯一示例
     for item in dataset:
-        if total_count >= max_total:
-            break
         intent = item["label_text"]
-        if intent in intents and len(intent_examples[intent]) == 0:
-            intent_examples[intent].append(item["text"])
-            total_count += 1
+        text = item["text"]
 
-    # 继续收集直到达到总数限制
-    for item in dataset:
-        if total_count >= max_total:
-            break
-        intent = item["label_text"]
-        if intent in intents and len(intent_examples[intent]) < 2:
-            intent_examples[intent].append(item["text"])
-            total_count += 1
+        if intent in intents and len(intent_examples[intent]) == 0:
+            if text not in used_texts:
+                intent_examples[intent].append(text)
+                used_texts.add(text)
+                total_count += 1
+
+                if total_count >= max_total:
+                    break
+
+    # 第二阶段：为已有示例的意图继续添加更多唯一示例，直到达到总数限制
+    if total_count < max_total:
+        for item in dataset:
+            if total_count >= max_total:
+                break
+
+            intent = item["label_text"]
+            text = item["text"]
+
+            if intent in intents and text not in used_texts:
+                intent_examples[intent].append(text)
+                used_texts.add(text)
+                total_count += 1
 
     few_shot_text = "以下是各意图的示例：\n\n"
     for intent in intents:
@@ -146,7 +158,12 @@ def extract_few_shot_examples(dataset, intents, max_total_examples=20):
             few_shot_text += "\n"
 
     actual_count = sum(len(v) for v in intent_examples.values())
-    logger.info(f"已提取 {actual_count} 个few-shot示例（限制: {max_total}）")
+    covered_intents = len(
+        [i for i in intents if i in intent_examples and intent_examples[i]]
+    )
+    logger.info(
+        f"已提取 {actual_count} 个唯一few-shot示例（限制: {max_total}），覆盖 {covered_intents}/{len(intents)} 个意图"
+    )
     return few_shot_text
 
 
@@ -164,7 +181,7 @@ def call_llm(text, few_shot_examples="", temperature=0.0):
 
     logger.debug(f"调用LLM，输入文本: {text[:50]}...")
     response = Generation.call(
-        model="deepseek-v3.2",
+        model="qwen-flash",
         messages=messages,
         result_format="message",
         parameters={"temperature": temperature},
@@ -258,4 +275,4 @@ def run_evaluation(num_samples=None, max_few_shot_examples=20):
 
 
 if __name__ == "__main__":
-    run_evaluation(num_samples=50, max_few_shot_examples=20)
+    run_evaluation(max_few_shot_examples=60)

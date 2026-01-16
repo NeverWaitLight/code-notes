@@ -10,6 +10,7 @@ public class AppProperties {
 	private String dbPath;
 	private long uploadMaxBytes;
 	private int hlsSegmentSeconds;
+	private int proxyVideoBitrateReductionPercent;
 
 	public String getStorageRoot() {
 		return storageRoot;
@@ -49,5 +50,13 @@ public class AppProperties {
 
 	public void setHlsSegmentSeconds(int hlsSegmentSeconds) {
 		this.hlsSegmentSeconds = hlsSegmentSeconds;
+	}
+
+	public int getProxyVideoBitrateReductionPercent() {
+		return proxyVideoBitrateReductionPercent;
+	}
+
+	public void setProxyVideoBitrateReductionPercent(int proxyVideoBitrateReductionPercent) {
+		this.proxyVideoBitrateReductionPercent = proxyVideoBitrateReductionPercent;
 	}
 }

@@ -42,6 +42,9 @@ public class Video {
 	@Column(name = "storage_path", nullable = false)
 	private String storagePath;
 
+	@Column(name = "proxy_path")
+	private String proxyPath;
+
 	@Column(name = "created_at", nullable = false)
 	private long createdAt;
 
@@ -124,6 +127,14 @@ public class Video {
 
 	public void setStoragePath(String storagePath) {
 		this.storagePath = storagePath;
+	}
+
+	public String getProxyPath() {
+		return proxyPath;
+	}
+
+	public void setProxyPath(String proxyPath) {
+		this.proxyPath = proxyPath;
 	}
 
 	public long getCreatedAt() {

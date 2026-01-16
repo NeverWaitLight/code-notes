@@ -7,7 +7,9 @@ import com.example.videodemo.exception.ApiException;
 import com.example.videodemo.repository.HlsPackageRepository;
 import com.example.videodemo.repository.VideoRepository;
 import com.example.videodemo.support.RecordingHlsSegmenter;
+import com.example.videodemo.support.RecordingProxyVideoGenerator;
 import com.example.videodemo.support.TestHlsSegmenterConfig;
+import com.example.videodemo.support.TestProxyVideoGeneratorConfig;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -31,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SpringBootTest
-@Import(TestHlsSegmenterConfig.class)
+@Import({TestHlsSegmenterConfig.class, TestProxyVideoGeneratorConfig.class})
 class VideoServiceTest {
 
 	private static final Path BASE_DIR = Paths.get("target/test-data-service").toAbsolutePath();
@@ -111,6 +113,12 @@ class VideoServiceTest {
 		Files.createDirectories(storagePath.getParent());
 		Files.write(storagePath, MP4_HEADER);
 		video.setStoragePath(storagePath.toString());
+
+		// 创建代理视频文件
+		Path proxyPath = storagePath.getParent().resolve("proxy.mp4");
+		Files.write(proxyPath, new byte[] { 0, 1, 2, 3 });
+		video.setProxyPath(proxyPath.toString());
+
 		video.setCreatedAt(System.currentTimeMillis());
 		video.setUpdatedAt(System.currentTimeMillis());
 		Video saved = repository.save(video);
@@ -134,6 +142,7 @@ class VideoServiceTest {
 		assertThat(repository.findById(saved.getId())).isEmpty();
 		assertThat(hlsRepository.findById(saved.getId())).isEmpty();
 		assertThat(Files.exists(storagePath)).isFalse();
+		assertThat(Files.exists(proxyPath)).isFalse();
 		assertThat(Files.exists(segmentDir)).isFalse();
 	}
 

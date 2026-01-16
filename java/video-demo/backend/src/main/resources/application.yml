@@ -4,6 +4,7 @@ app:
   hls-segment-seconds: ${APP_HLS_SEGMENT_SECONDS:2}
   db-path: ${APP_DB_PATH:../data/app.db}
   upload-max-bytes: ${APP_UPLOAD_MAX_BYTES:5368709120}
+  proxy-video-bitrate-reduction-percent: ${APP_PROXY_VIDEO_BITRATE_REDUCTION_PERCENT:50}
 
 spring:
   datasource:

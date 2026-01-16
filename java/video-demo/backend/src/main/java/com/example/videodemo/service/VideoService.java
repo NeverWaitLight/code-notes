@@ -175,9 +175,17 @@ public class VideoService {
 
 		IOException fileDeleteException = null;
 		try {
+			// 删除原始视频文件
 			Path storagePath = resolveSourcePath(video.getStoragePath());
 			Files.deleteIfExists(storagePath);
 
+			// 删除代理视频文件（如果存在）
+			if (video.getProxyPath() != null && !video.getProxyPath().isBlank()) {
+				Path proxyPath = resolveSourcePath(video.getProxyPath());
+				Files.deleteIfExists(proxyPath);
+			}
+
+			// 删除 HLS 分片目录
 			if (segmentDir != null) {
 				Path segmentDirPath = Paths.get(segmentDir);
 				if (segmentDirPath.isAbsolute()) {

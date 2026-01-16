@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn test:*)",
+      "Bash(mvn clean test:*)",
+      "Bash(mvn compile:*)",
+      "Bash(mvn checkstyle:check:*)",
+      "Bash(sqlite3:*)",
+      "Bash(mvn dependency:tree:*)",
+      "Bash(mvn spring-boot:run:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill //F //PID 3068)",
+      "Bash(mvn exec:java:*)",
+      "Bash(mvn clean compile:*)",
+      "Bash(curl:*)"
+    ]
+  }
+}

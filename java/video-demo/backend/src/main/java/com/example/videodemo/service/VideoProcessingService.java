@@ -25,15 +25,18 @@ public class VideoProcessingService {
 	private final HlsPackageRepository hlsRepository;
 	private final AppProperties properties;
 	private final HlsSegmenter segmenter;
+	private final ProxyVideoGenerator proxyVideoGenerator;
 
 	public VideoProcessingService(VideoRepository videoRepository,
 			HlsPackageRepository hlsRepository,
 			AppProperties properties,
-			HlsSegmenter segmenter) {
+			HlsSegmenter segmenter,
+			ProxyVideoGenerator proxyVideoGenerator) {
 		this.videoRepository = videoRepository;
 		this.hlsRepository = hlsRepository;
 		this.properties = properties;
 		this.segmenter = segmenter;
+		this.proxyVideoGenerator = proxyVideoGenerator;
 	}
 
 	@Async
@@ -56,11 +59,30 @@ public class VideoProcessingService {
 			if (Files.notExists(sourcePath)) {
 				throw new IOException("Source file missing");
 			}
+
+			// 生成代理视频
+			Path proxyPath = resolveProxyPath(videoId);
+			ProxyVideoResult proxyResult;
+			try {
+				proxyResult = proxyVideoGenerator.generate(sourcePath, proxyPath);
+			} catch (Exception ex) {
+				video.setStatus(VideoStatus.FAILED);
+				video.setErrorCode("PROXY_GENERATION_FAILED");
+				video.setErrorMessage(safeMessage(ex));
+				videoRepository.save(video);
+				return;
+			}
+
+			// 更新代理视频路径
+			video.setProxyPath(proxyPath.toString());
+			videoRepository.save(video);
+
+			// 使用代理视频进行 HLS 分片
 			int segmentSeconds = properties.getHlsSegmentSeconds();
 			if (segmentSeconds <= 0) {
 				segmentSeconds = 2;
 			}
-			HlsSegmentResult result = segmenter.segment(sourcePath, outputDir, segmentSeconds, SEGMENT_PATTERN);
+			HlsSegmentResult result = segmenter.segment(proxyPath, outputDir, segmentSeconds, SEGMENT_PATTERN);
 
 			HlsPackage hlsPackage = new HlsPackage();
 			hlsPackage.setVideoId(video.getId());
@@ -89,6 +111,11 @@ public class VideoProcessingService {
 			return storagePath.normalize();
 		}
 		return Paths.get("").toAbsolutePath().resolve(storagePath).normalize();
+	}
+
+	private Path resolveProxyPath(Long videoId) {
+		Path storageRoot = resolveStorageRoot();
+		return storageRoot.resolve(String.valueOf(videoId)).resolve("proxy.mp4").normalize();
 	}
 
 	private Path resolveHlsDirectory(Long videoId) {

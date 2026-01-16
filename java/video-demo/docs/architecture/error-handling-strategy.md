@@ -30,17 +30,18 @@ interface ApiError {
 
 ## Error Code Catalog
 
-| Code               | HTTP | 场景             |
-| ------------------ | ---- | ---------------- |
-| VIDEO_NOT_FOUND    | 404  | 视频不存在       |
-| INVALID_REQUEST    | 400  | 参数缺失或非法   |
-| UPLOAD_TOO_LARGE   | 413  | 超过 5GB 限制    |
-| INVALID_MEDIA_TYPE | 400  | 非 H.264 MP4     |
-| PROCESSING_FAILED  | 500  | 切片失败         |
-| HLS_NOT_READY      | 409  | 视频未就绪       |
-| STORAGE_IO_ERROR   | 500  | 文件系统读写失败 |
-| DB_ERROR           | 500  | 数据库错误       |
-| INTERNAL_ERROR     | 500  | 未分类服务器错误 |
+| Code                       | HTTP | 场景             |
+| -------------------------- | ---- | ---------------- |
+| VIDEO_NOT_FOUND            | 404  | 视频不存在       |
+| INVALID_REQUEST            | 400  | 参数缺失或非法   |
+| UPLOAD_TOO_LARGE           | 413  | 超过 5GB 限制    |
+| INVALID_MEDIA_TYPE         | 400  | 非 H.264 MP4     |
+| PROXY_GENERATION_FAILED    | 500  | 代理视频生成失败 |
+| PROCESSING_FAILED          | 500  | 切片失败         |
+| HLS_NOT_READY              | 409  | 视频未就绪       |
+| STORAGE_IO_ERROR           | 500  | 文件系统读写失败 |
+| DB_ERROR                   | 500  | 数据库错误       |
+| INTERNAL_ERROR             | 500  | 未分类服务器错误 |
 
 ## Frontend Error Handling
 

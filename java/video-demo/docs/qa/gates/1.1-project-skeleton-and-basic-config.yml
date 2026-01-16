@@ -1,0 +1,17 @@
+﻿schema: 1
+story: "1.1"
+story_title: "项目骨架与基础配置"
+gate: "PASS"
+status_reason: "AC 已满足：后端可启动、SQLite 配置就绪、视频与 HLS 目录可配置并在启动时创建，根目录结构与启动脚本完备。"
+reviewer: "Quinn (Test Architect)"
+updated: "2026-01-15T11:31:39.2769080+08:00"
+
+waiver: { active: false }
+
+top_issues: []
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []

@@ -1,0 +1,47 @@
+schema: 1
+story: "2.2"
+story_title: "上传页与进度展示"
+gate: "PASS"
+status_reason: "所有验收标准已满足，测试覆盖完整（44个测试全部通过），代码质量优秀，发现并修复了AC3不符合问题。"
+reviewer: "Quinn (Test Architect)"
+updated: "2026-01-15T16:47:00+08:00"
+
+waiver: { active: false }
+
+top_issues: []
+
+evidence:
+  tests_reviewed: 44
+  tests_passed: 44
+  test_files: 6
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4]
+    ac_gaps: []
+  test_coverage:
+    videoService: "9 tests - 覆盖成功上传、进度回调、各种错误场景（INVALID_MEDIA_TYPE、UPLOAD_TOO_LARGE、STORAGE_IO_ERROR、网络错误、无效JSON响应）"
+    uploadStore: "7 tests - 覆盖初始状态、开始上传、进度更新、上传失败、移除项、activeUploads getter、上传成功后自动移除"
+    UploadPage: "10 tests - 覆盖表单显示、文件验证（大小、类型）、标题验证、提交上传、上传中显示、失败显示、按钮禁用"
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全风险，文件类型和大小验证已实现，符合故事要求"
+  performance:
+    status: PASS
+    notes: "性能表现优秀，使用XMLHttpRequest进度事件，实时更新不影响性能"
+  reliability:
+    status: PASS
+    notes: "错误处理健壮，覆盖所有错误场景（文件类型、大小、网络、服务器错误），已通过测试验证"
+  maintainability:
+    status: PASS
+    notes: "代码结构清晰，测试覆盖完整，可维护性优秀。唯一小优化：uploadStore中可缓存item查找结果"
+
+recommendations:
+  immediate: []
+  future:
+    - action: "考虑优化uploadStore中多次查找item的性能，使用变量缓存查找结果"
+      refs: ["frontend/src/stores/uploadStore.ts"]
+
+quality_score: 100
+expires: "2026-01-29T16:47:00+08:00"

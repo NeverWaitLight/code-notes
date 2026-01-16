@@ -1,0 +1,27 @@
+app:
+  storage-root: ${APP_STORAGE_ROOT:../data/videos}
+  hls-root: ${APP_HLS_ROOT:${app.storage-root}}
+  hls-segment-seconds: ${APP_HLS_SEGMENT_SECONDS:2}
+  db-path: ${APP_DB_PATH:../data/app.db}
+  upload-max-bytes: ${APP_UPLOAD_MAX_BYTES:5368709120}
+
+spring:
+  datasource:
+    url: jdbc:sqlite:${app.db-path}
+    driver-class-name: org.sqlite.JDBC
+  jpa:
+    database-platform: org.hibernate.community.dialect.SQLiteDialect
+    hibernate:
+      ddl-auto: update
+  servlet:
+    multipart:
+      max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:5GB}
+      max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:5GB}
+      file-size-threshold: ${SPRING_SERVLET_MULTIPART_FILE_SIZE_THRESHOLD:1MB}
+      location: ${SPRING_SERVLET_MULTIPART_LOCATION:../data/tmp}
+
+server:
+  tomcat:
+    max-swallow-size: ${SERVER_TOMCAT_MAX_SWALLOW_SIZE:5GB}
+    connection-timeout: ${SERVER_TOMCAT_CONNECTION_TIMEOUT:600000}
+    keep-alive-timeout: ${SERVER_TOMCAT_KEEP_ALIVE_TIMEOUT:600000}

@@ -1,0 +1,17 @@
+﻿schema: 1
+story: "1.2"
+story_title: "上传接口与元数据落库"
+gate: "PASS"
+status_reason: "已重新运行测试并通过，上传/列表实现满足 AC，错误处理与持久化覆盖完备。"
+reviewer: "Quinn (Test Architect)"
+updated: "2026-01-15T13:54:31.9144666+08:00"
+
+waiver: { active: false }
+
+top_issues: []
+
+risk_summary:
+  totals: { critical: 0, high: 0, medium: 0, low: 0 }
+  recommendations:
+    must_fix: []
+    monitor: []

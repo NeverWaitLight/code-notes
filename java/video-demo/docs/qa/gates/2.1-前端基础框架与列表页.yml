@@ -1,0 +1,46 @@
+schema: 1
+story: "2.1"
+story_title: "前端基础框架与列表页"
+gate: "PASS"
+status_reason: "所有验收标准已满足，测试覆盖完整（20个测试全部通过），代码质量优秀，所有改进建议已实施。"
+reviewer: "Quinn (Test Architect)"
+updated: "2026-01-15T16:20:00+08:00"
+
+waiver: { active: false }
+
+top_issues: []
+
+evidence:
+  tests_reviewed: 20
+  tests_passed: 20
+  test_files: 4
+  risks_identified: 0
+  trace:
+    ac_covered: [1, 2, 3, 4]
+    ac_gaps: []
+  test_coverage:
+    apiClient: "6 tests - 覆盖成功响应、JSON错误、非JSON错误、空文本响应、网络错误、未知错误"
+    videoService: "2 tests - 覆盖成功调用和错误处理"
+    videoStore: "5 tests - 覆盖初始状态、成功加载、loading状态、错误处理、未知错误"
+    VideoListPage: "7 tests - 覆盖挂载调用、加载状态、错误状态、空态、列表显示、状态中文显示、点击跳转"
+
+nfr_validation:
+  security:
+    status: PASS
+    notes: "无安全风险，前端无鉴权需求，符合故事要求"
+  performance:
+    status: PASS
+    notes: "性能表现优秀，无性能瓶颈"
+  reliability:
+    status: PASS
+    notes: "错误处理健壮，支持多种错误场景，已通过测试验证"
+  maintainability:
+    status: PASS
+    notes: "代码结构清晰，测试覆盖完整，可维护性优秀"
+
+recommendations:
+  immediate: []
+  future: []
+
+quality_score: 100
+expires: "2026-01-29T16:20:00+08:00"

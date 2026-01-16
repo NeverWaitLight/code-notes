@@ -26,65 +26,65 @@ dataset = load_dataset("SetFit/amazon_massive_intent_zh-CN", split="validation")
 logger.info(f"数据集加载完成，共 {len(dataset)} 条样本")
 
 INTENTS = [
-    "calendar_remove",
-    "transport_ticket",
-    "qa_factoid",
-    "iot_hue_lightdim",
-    "datetime_convert",
-    "iot_hue_lightup",
-    "music_dislikeness",
-    "iot_hue_lightoff",
-    "alarm_query",
-    "play_music",
-    "music_likeness",
-    "lists_query",
-    "transport_taxi",
-    "qa_stock",
-    "iot_wemo_on",
-    "email_query",
-    "general_quirky",
-    "general_joke",
-    "music_query",
-    "play_podcasts",
-    "recommendation_movies",
-    "social_post",
-    "play_game",
-    "transport_traffic",
-    "email_querycontact",
-    "recommendation_locations",
-    "calendar_set",
-    "play_audiobook",
-    "calendar_query",
-    "audio_volume_mute",
-    "email_sendemail",
-    "transport_query",
-    "audio_volume_up",
-    "music_settings",
-    "lists_createoradd",
-    "qa_currency",
-    "email_addcontact",
-    "play_radio",
-    "audio_volume_down",
-    "takeaway_order",
-    "iot_wemo_off",
-    "cooking_recipe",
-    "general_greet",
-    "weather_query",
-    "alarm_set",
-    "iot_hue_lighton",
-    "iot_cleaning",
-    "datetime_query",
-    "qa_maths",
-    "qa_definition",
-    "cooking_query",
-    "alarm_remove",
-    "iot_coffee",
-    "iot_hue_lightchange",
-    "recommendation_events",
-    "takeaway_query",
-    "lists_remove",
-    "social_query",
-    "news_query",
+    {"intent": "calendar_remove", "intent_ch": "删除日历"},
+    {"intent": "transport_ticket", "intent_ch": "交通票务"},
+    {"intent": "qa_factoid", "intent_ch": "事实问答"},
+    {"intent": "iot_hue_lightdim", "intent_ch": "调暗智能灯光"},
+    {"intent": "datetime_convert", "intent_ch": "时间转换"},
+    {"intent": "iot_hue_lightup", "intent_ch": "调亮智能灯光"},
+    {"intent": "music_dislikeness", "intent_ch": "音乐不喜欢"},
+    {"intent": "iot_hue_lightoff", "intent_ch": "关闭智能灯光"},
+    {"intent": "alarm_query", "intent_ch": "查询闹钟"},
+    {"intent": "play_music", "intent_ch": "播放音乐"},
+    {"intent": "music_likeness", "intent_ch": "音乐喜欢"},
+    {"intent": "lists_query", "intent_ch": "查询清单"},
+    {"intent": "transport_taxi", "intent_ch": "打车服务"},
+    {"intent": "qa_stock", "intent_ch": "股票查询"},
+    {"intent": "iot_wemo_on", "intent_ch": "开启智能开关"},
+    {"intent": "email_query", "intent_ch": "查询邮件"},
+    {"intent": "general_quirky", "intent_ch": "一般性古怪问题"},
+    {"intent": "general_joke", "intent_ch": "讲笑话"},
+    {"intent": "music_query", "intent_ch": "查询音乐"},
+    {"intent": "play_podcasts", "intent_ch": "播放播客"},
+    {"intent": "recommendation_movies", "intent_ch": "推荐电影"},
+    {"intent": "social_post", "intent_ch": "社交发布"},
+    {"intent": "play_game", "intent_ch": "玩游戏"},
+    {"intent": "transport_traffic", "intent_ch": "交通路况"},
+    {"intent": "email_querycontact", "intent_ch": "查询联系人邮箱"},
+    {"intent": "recommendation_locations", "intent_ch": "推荐地点"},
+    {"intent": "calendar_set", "intent_ch": "设置日历"},
+    {"intent": "play_audiobook", "intent_ch": "播放有声书"},
+    {"intent": "calendar_query", "intent_ch": "查询日历"},
+    {"intent": "audio_volume_mute", "intent_ch": "静音"},
+    {"intent": "email_sendemail", "intent_ch": "发送邮件"},
+    {"intent": "transport_query", "intent_ch": "交通查询"},
+    {"intent": "audio_volume_up", "intent_ch": "增大音量"},
+    {"intent": "music_settings", "intent_ch": "音乐设置"},
+    {"intent": "lists_createoradd", "intent_ch": "创建或添加清单"},
+    {"intent": "qa_currency", "intent_ch": "货币汇率查询"},
+    {"intent": "email_addcontact", "intent_ch": "添加联系人"},
+    {"intent": "play_radio", "intent_ch": "播放电台"},
+    {"intent": "audio_volume_down", "intent_ch": "降低音量"},
+    {"intent": "takeaway_order", "intent_ch": "外卖订购"},
+    {"intent": "iot_wemo_off", "intent_ch": "关闭智能开关"},
+    {"intent": "cooking_recipe", "intent_ch": "烹饪菜谱"},
+    {"intent": "general_greet", "intent_ch": "一般性问候"},
+    {"intent": "weather_query", "intent_ch": "天气查询"},
+    {"intent": "alarm_set", "intent_ch": "设置闹钟"},
+    {"intent": "iot_hue_lighton", "intent_ch": "开启智能灯光"},
+    {"intent": "iot_cleaning", "intent_ch": "智能清洁"},
+    {"intent": "datetime_query", "intent_ch": "日期时间查询"},
+    {"intent": "qa_maths", "intent_ch": "数学计算"},
+    {"intent": "qa_definition", "intent_ch": "定义查询"},
+    {"intent": "cooking_query", "intent_ch": "烹饪查询"},
+    {"intent": "alarm_remove", "intent_ch": "删除闹钟"},
+    {"intent": "iot_coffee", "intent_ch": "智能咖啡机"},
+    {"intent": "iot_hue_lightchange", "intent_ch": "改变智能灯光颜色"},
+    {"intent": "recommendation_events", "intent_ch": "推荐活动"},
+    {"intent": "takeaway_query", "intent_ch": "外卖查询"},
+    {"intent": "lists_remove", "intent_ch": "删除清单项"},
+    {"intent": "social_query", "intent_ch": "社交查询"},
+    {"intent": "news_query", "intent_ch": "新闻查询"},
 ]
 
 SYSTEM_PROMPT_TEMPLATE = textwrap.dedent("""
@@ -93,7 +93,7 @@ SYSTEM_PROMPT_TEMPLATE = textwrap.dedent("""
     
     # Task
     请分析用户输入的文本，并从给定的意图列表 {INTENTS} 中选择最匹配的一个。如果用户的输入不属于列表中的任何意图，请将其归类为 "unknown"。
-    
+    先判断请求的领域（Domain，如：音乐、家电），再从该领域下选择具体意图。
     # Few-Shot Examples
     {FEW_SHOT_EXAMPLES}
     
@@ -111,11 +111,13 @@ SYSTEM_PROMPT_TEMPLATE = textwrap.dedent("""
     """).strip()
 
 
-def extract_few_shot_examples(dataset, intents, max_total_examples=20):
+def extract_few_shot_examples(dataset, intents_list, max_total_examples=20):
     """
     从数据集中提取示例用于few-shot learning，总数限制为max_total_examples
     确保每个意图至少有一个示例，且所有示例文本都不重复
+    intents_list: 意图列表，每个元素为包含 intent 和 intent_ch 的字典
     """
+    intent_names = [item["intent"] for item in intents_list]
     intent_examples = defaultdict(list)
     used_texts = set()
     total_count = 0
@@ -126,7 +128,7 @@ def extract_few_shot_examples(dataset, intents, max_total_examples=20):
         intent = item["label_text"]
         text = item["text"]
 
-        if intent in intents and len(intent_examples[intent]) == 0:
+        if intent in intent_names and len(intent_examples[intent]) == 0:
             if text not in used_texts:
                 intent_examples[intent].append(text)
                 used_texts.add(text)
@@ -144,32 +146,37 @@ def extract_few_shot_examples(dataset, intents, max_total_examples=20):
             intent = item["label_text"]
             text = item["text"]
 
-            if intent in intents and text not in used_texts:
+            if intent in intent_names and text not in used_texts:
                 intent_examples[intent].append(text)
                 used_texts.add(text)
                 total_count += 1
 
     few_shot_text = "以下是各意图的示例：\n\n"
-    for intent in intents:
+    for intent_item in intents_list:
+        intent = intent_item["intent"]
+        intent_ch = intent_item["intent_ch"]
         if intent in intent_examples and intent_examples[intent]:
-            few_shot_text += f"意图: {intent}\n"
+            few_shot_text += f"意图: {intent} ({intent_ch})\n"
             for example in intent_examples[intent]:
                 few_shot_text += f"  示例: {example}\n"
             few_shot_text += "\n"
 
     actual_count = sum(len(v) for v in intent_examples.values())
     covered_intents = len(
-        [i for i in intents if i in intent_examples and intent_examples[i]]
+        [i for i in intent_names if i in intent_examples and intent_examples[i]]
     )
     logger.info(
-        f"已提取 {actual_count} 个唯一few-shot示例（限制: {max_total}），覆盖 {covered_intents}/{len(intents)} 个意图"
+        f"已提取 {actual_count} 个唯一few-shot示例（限制: {max_total}），覆盖 {covered_intents}/{len(intent_names)} 个意图"
     )
     return few_shot_text
 
 
 def call_llm(text, few_shot_examples="", temperature=0.0):
+    intents_str = ", ".join(
+        [f"{item['intent']} ({item['intent_ch']})" for item in INTENTS]
+    )
     system_prompt = SYSTEM_PROMPT_TEMPLATE.format(
-        INTENTS=str(INTENTS), FEW_SHOT_EXAMPLES=few_shot_examples
+        INTENTS=intents_str, FEW_SHOT_EXAMPLES=few_shot_examples
     )
 
     messages = [
@@ -181,7 +188,7 @@ def call_llm(text, few_shot_examples="", temperature=0.0):
 
     logger.debug(f"调用LLM，输入文本: {text[:50]}...")
     response = Generation.call(
-        model="qwen-flash",
+        model="deepseek-v3.2",
         messages=messages,
         result_format="message",
         parameters={"temperature": temperature},

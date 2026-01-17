@@ -44,18 +44,17 @@ public class JavaCvProxyVideoGenerator implements ProxyVideoGenerator {
         String ffmpegPath = Loader.load(org.bytedeco.ffmpeg.ffmpeg.class);
 
         // 使用 libx264 编码器（JavaCV FFmpeg 自带）
-        // ffmpeg -i input.mp4 -map 0 -c:v libx264 -crf 28 -preset medium -c:a copy -c:d copy -map_metadata 0 output.mp4
         ProcessBuilder pb = new ProcessBuilder(
                 ffmpegPath,
                 "-i", inputPath.toAbsolutePath().toString(),
                 "-map", "0",
                 "-c:v", "libx264", // use H.264 encoder
-				"-g", "1",
-                "-crf", "28",
+				"-g", "1", // 全部转换为关键帧
+                "-crf", "28", // 转换完的体积更小，越靠近50体积越小，越接近0质量越好
                 "-preset", "medium",
                 "-c:a", "copy",
                 "-c:d", "copy",
-                "-map_metadata", "0",
+                "-map_metadata", "0", // 拷贝时间码等元数据
                 "-y", // 覆盖已存在的文件
                 outputPath.toAbsolutePath().toString());
         pb.redirectErrorStream(true);

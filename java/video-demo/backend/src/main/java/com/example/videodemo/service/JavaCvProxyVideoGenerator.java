@@ -28,46 +28,29 @@ public class JavaCvProxyVideoGenerator implements ProxyVideoGenerator {
 
 		// 获取原视频信息
 		int originalFrameCount;
-		double originalFrameRate;
-		int originalBitrate;
 		double durationSeconds;
 
 		try (FFmpegFrameGrabber grabber = new FFmpegFrameGrabber(inputPath.toString())) {
 			grabber.start();
 			originalFrameCount = grabber.getLengthInFrames();
-			originalFrameRate = grabber.getFrameRate();
-			originalBitrate = grabber.getVideoBitrate();
 			long lengthMicros = grabber.getLengthInTime();
 			durationSeconds = lengthMicros / 1_000_000.0;
 			grabber.stop();
 		}
-
-		// 计算目标码率（根据配置减少百分比）
-		int reductionPercent = properties.getProxyVideoBitrateReductionPercent();
-		if (reductionPercent <= 0 || reductionPercent >= 100) {
-			reductionPercent = 50; // 默认 50%
-		}
-		int targetBitrate = (int) (originalBitrate * (1 - reductionPercent / 100.0));
-		if (targetBitrate <= 0) {
-			targetBitrate = 500_000; // 最低 500kbps
-		}
-
-		// 确保输出目录存在
 		Files.createDirectories(outputPath.getParent());
 
 		// 使用 FFmpeg 生成代理视频
 		String ffmpegPath = Loader.load(org.bytedeco.ffmpeg.ffmpeg.class);
 
-		// 使用 libopenh264 编码器（JavaCV FFmpeg 自带）
+		// 使用 libx264 编码器（JavaCV FFmpeg 自带）
 		ProcessBuilder pb = new ProcessBuilder(
 				ffmpegPath,
 				"-i", inputPath.toAbsolutePath().toString(),
-				"-c:v", "libopenh264", // 使用 OpenH264 编码器
-				"-b:v", String.valueOf(targetBitrate), // 目标视频码率
-				"-r", String.valueOf(originalFrameRate), // 保持帧率不变
-				"-c:a", "aac", // 音频编码
-				"-b:a", "128k", // 音频码率
-				"-movflags", "+faststart", // 优化 MP4 播放
+				"-c:v", "libx264", // use H.264 encoder
+				"-preset", "medium",
+				"-crf", "23",
+				"-vf", "scale=-1:720",
+				"-c:a", "copy",
 				"-y", // 覆盖已存在的文件
 				outputPath.toAbsolutePath().toString());
 		pb.redirectErrorStream(true);

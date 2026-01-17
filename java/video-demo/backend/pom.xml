@@ -48,16 +48,21 @@
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.45.2.0</version>
         </dependency>
+
+        <!-- javacv ffmpeg and opencv for java -->
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>javacv-platform</artifactId>
             <version>1.5.10</version>
         </dependency>
+        <!-- 有这个包才能使用 libx264  -->
+        <!-- 没有这个包就只能使用 libopenh264  -->
         <dependency>
             <groupId>org.bytedeco</groupId>
             <artifactId>ffmpeg-platform-gpl</artifactId>
             <version>7.1.1-1.5.12</version>
         </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

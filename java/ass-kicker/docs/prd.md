@@ -23,6 +23,39 @@
 | ---------- | ------- | ------------------------------------------- | --------- |
 | 2026-01-23 | v0.1    | 初稿：基于 Project Brief 起草 Goals/Context | John (PM) |
 
+## MVP Scope
+
+### In Scope (Must Have)
+- 统一发送 API 与鉴权，支持通知请求标准化接入
+- 异步投递处理闭环（入队、处理、状态流转）
+- 多渠道接入框架（SMS/Email/IM/Push），至少 1 个邮件渠道具备端到端可用能力，其余可先具备基础适配能力
+- 智能路由与基础故障转移/重试策略
+- 模板与多语言支持（基础版本）
+- 消息日志、状态追踪与回执记录
+- 广播/批量发送能力（基础策略）
+- 管理控制台核心页面（日志、模板、路由、供应商、状态）
+- 交付物：ass-kicker-server、ass-kicker-channel-builder、ass-kicker-java-client、ass-kicker-admin
+
+### Out of Scope (Not in MVP)
+- 高级可视化控制台与 BI 报表
+- 多租户商业化计费体系
+- 全面合规审计与复杂审批流
+- 复杂的推荐/AI 智能路由优化
+
+### MVP Success Criteria
+- 在首批业务系统中替换现有通知实现并可稳定运行
+- 送达率 ≥ 99.5%，故障切换时间 < 30s，常规通知 P95 < 5s
+- 新业务接入周期 < 1 周（在既定 SDK/适配规范下）
+
+### MVP Validation Approach
+- 选定首批接入场景：登录验证码
+- 以真实流量验证 KPI（送达率、延迟、故障切换、接入周期）
+- 验证 Java JDK 包（ass-kicker-java-client）接入效率与兼容性
+
+### MVP Timeline & Rollout
+- 目标时间框架：3 周
+- 交付节奏：先后端闭环，再接入渠道/路由治理，再完善控制台
+
 ## Requirements
 
 ### Functional
@@ -37,6 +70,10 @@
 8. FR8: 支持单播、多播、广播等发送模式。
 9. FR9: 提供发送方鉴权与通道权限校验。
 10. FR10: 提供基础限流与配额控制，防止资源被过度占用。
+11. FR11: 提供后端 server 项目（ass-kicker-server）作为统一通知平台服务入口与核心运行载体。
+12. FR12: 提供通道开发模板项目（ass-kicker-channel-builder），支持供应商适配的快速开发与规范化接入。
+13. FR13: 提供可分发的 Java JDK 包（ass-kicker-java-client，内置消息发送 client），配置调用者信息即可调用本系统。
+14. FR14: 提供前端管理台项目（ass-kicker-admin），用于平台运营与治理。
 
 ### Non Functional
 
@@ -79,6 +116,66 @@ Unit + Integration
 - 可观测性：日志/指标/追踪需覆盖路由、投递、回执关键路径
 - 前端：Vue 3
 - 组件库：Ant Design Vue
+- 后端工程结构：包含 ass-kicker-server 与 ass-kicker-channel-builder
+- 集成交付：提供可分发的 Java JDK 包（ass-kicker-java-client，内置消息发送 client），配置调用者信息即可接入
+
+## Data & Integration Requirements
+
+### Core Data Entities (MVP)
+- Sender/Client：调用方信息与鉴权配置
+- BusinessLine：业务线标识与归属
+- Message：消息主记录（ID、状态、优先级、渠道、目标地址、时间戳、业务线标识）
+- Template/TemplateVersion/Locale：模板与多语言版本
+- ChannelProvider：渠道与供应商配置
+- RoutingRule：路由条件与供应商选择规则
+- DeliveryAttempt：投递尝试记录（次数、供应商、结果、耗时）
+- Receipt：回执与最终状态
+- AuditLog：配置变更审计（模板、路由、供应商、限流）
+
+### Data Retention & Quality
+- 消息日志与投递尝试：默认保留 90 天（可配置）
+- 回执与最终状态：默认保留 90 天（可配置）
+- 审计记录：默认保留 180 天（可配置）
+- 状态流转需满足可追溯性与一致性（避免跳转/丢失）
+
+### Integration Requirements
+- 渠道供应商接入需遵循统一适配规范（通过 ass-kicker-channel-builder）
+- MVP 至少完成 1 个邮件供应商端到端接入
+- 对外 API 需版本化与向后兼容，发送/查询/模板管理为核心接口
+- Java 客户端（ass-kicker-java-client）需支持配置化接入与版本化分发
+- 模拟/沙箱能力后置（非 MVP）
+
+### API & Client Versioning (Draft)
+- API 版本策略：URI 前缀版本（例如 `/api/v1`），保持向后兼容
+- 鉴权方式：JWT
+- 幂等性：发送接口需支持幂等键，避免重复投递
+- Java 客户端分发：内部 Maven 发布（ass-kicker-java-client），版本遵循语义化（SemVer）
+- 兼容策略：客户端与 API 版本可独立演进，保证同主版本向后兼容
+- 配置方式：调用方需配置业务线标识、鉴权信息、默认渠道/优先级（可覆盖）
+
+## Operations & Monitoring Requirements
+
+### Deployment & Environments
+- 支持最少 2 套环境：测试环境与生产环境
+- 服务可水平扩展（WebFlux + Kafka Worker）
+- MVP 不要求多可用区/多地域
+
+### Observability
+- 日志：结构化日志覆盖请求、路由、投递、回执、失败原因（ELK）
+- 指标：投递成功率、失败率、P95 延迟、队列积压、故障切换次数（Prometheus/Grafana）
+- 追踪：跨服务/组件的链路追踪（含消息 ID 关联）
+
+### Alerting & SLO
+- 关键告警：成功率下降、延迟异常、队列积压、供应商异常
+- SLO 参考：送达率 ≥ 99.5%，P95 < 5s，故障切换 < 30s
+
+### Audit & Security Operations
+- 审计日志：模板/路由/供应商/限流配置变更可追溯
+- JWT 密钥与权限管理需符合企业安全规范
+
+### Backup & Recovery
+- 关键数据（模板/路由/消息状态）需具备备份与恢复机制
+- 恢复时间目标：RTO 30 分钟，RPO 5 分钟
 
 ## User Interface Design Goals
 
@@ -117,6 +214,19 @@ Unit + Integration
 ### Target Device and Platforms: Web Responsive
 
 以 Web 控制台为主，桌面浏览器优先，兼容常见屏幕尺寸。
+
+### User Journeys & Key Flows (MVP)
+- 登录/鉴权 → 进入 Dashboard 查看整体投递健康度
+- 运营创建模板（含多语言）→ 预览 → 发布
+- 配置路由规则 → 绑定供应商 → 启用生效
+- 查询消息日志 → 查看详情 → 回执/失败原因追溯
+- 供应商异常 → 手动切换或暂停 → 记录审计
+
+### Error Handling & Recovery
+- 配置保存失败：提示原因并允许重试/撤销
+- 路由配置冲突：显式提示冲突规则并阻止发布
+- 供应商不可用：引导切换备用或暂停通道
+- 日志查询超时：提示并建议缩小查询范围
 
 ## Epic List
 
@@ -159,22 +269,20 @@ so that 我能获得稳定的投递处理能力且不阻塞业务线程。
 
 **Prerequisite**：Story 1.1
 
-### Story 1.3 消息状态查询与追踪
+### Story 1.4 开发者接入产物与模板
 
-As a 业务系统研发团队,  
-I want 查询消息的投递状态与关键元数据,  
-so that 我能验证投递结果并进行问题排查。
+As a 平台工程团队,  
+I want 提供 server 项目、通道开发模板与可分发 JDK 包,  
+so that 新渠道开发与业务系统接入更高效、标准化。
 
 **Acceptance Criteria**
 
-1. 提供消息状态查询接口（按消息 ID 查询）。
-2. 返回包含当前状态、时间戳、渠道/供应商（如有）等关键字段。
-3. 对不存在或无权限的消息 ID 返回明确错误。
-4. 状态查询的响应时间满足常规 SLA。
+1. 后端 server 项目可独立构建与运行，作为统一通知平台服务入口。
+2. 通道开发模板项目包含标准化接口与示例，支持快速接入新供应商。
+3. 提供可分发的 JDK 打包产物，用于业务系统快速对接与运行依赖。
+4. 模板与打包产物有基础文档说明其使用方式。
 
-**Prerequisite**：Story 1.1
-
-## Epic 2 Routing & Resilience
+**Prerequisite**：Story 1.1## Epic 2 Routing & Resilience
 
 **Epic Goal**  
 引入智能路由与可靠性机制：在多供应商条件下自动选择最优投递路径，并在失败时进行故障转移与重试，确保送达率与可用性达到目标。
@@ -328,3 +436,70 @@ so that 我能及时发现并处理供应商异常。
 3. 支持阈值告警入口（可与现有告警系统对接）。
 
 **Prerequisite**：Story 2.2
+
+
+## Checklist Results Report
+
+### Executive Summary
+- PRD 完整度：约 82%
+- MVP 范围评估：基本合适（3 周交付仍有节奏风险）
+- 架构阶段准备度：Nearly Ready
+- 关键缺口：用户研究/竞品分析与成功基线；本地可测试性与首史诗初始化说明；关键干系人与沟通机制
+
+### Category Statuses
+
+| Category                         | Status   | Critical Issues |
+| -------------------------------- | -------- | --------------- |
+| 1. Problem Definition & Context  | PARTIAL  | 用户研究/竞品分析缺失；成功指标基线未明确 |
+| 2. MVP Scope Definition          | PASS     | 交付范围明确，但 3 周节奏有风险 |
+| 3. User Experience Requirements  | PARTIAL  | 关键流程已补充，边界场景仍不完整 |
+| 4. Functional Requirements       | PARTIAL  | 本地可测试性要求未明确 |
+| 5. Non-Functional Requirements   | PARTIAL  | 安全合规细节（密钥轮换/审计深度）未明确 |
+| 6. Epic & Story Structure        | PARTIAL  | 首史诗缺少初始化/本地验证要求 |
+| 7. Technical Guidance            | PARTIAL  | 关键技术取舍与风险未系统化说明 |
+| 8. Cross-Functional Requirements | PARTIAL  | 数据质量/迁移/一致性策略未明确 |
+| 9. Clarity & Communication       | PARTIAL  | 关键干系人与沟通机制未定义 |
+
+### Top Issues by Priority
+
+**BLOCKERS**
+- 当前无硬性阻塞项
+
+**HIGH**
+- 补充用户研究/竞品分析与成功指标基线
+- 明确本地可测试性要求（例如 CLI/测试桩/模拟供应商策略）
+- 明确首史诗的工程初始化与验证清单
+
+**MEDIUM**
+- 细化安全合规细节（JWT 密钥轮换/权限模型/审计深度）
+- 数据一致性与质量策略（幂等、去重、状态回放）
+
+**LOW**
+- 识别关键干系人与沟通机制
+
+### MVP Scope Assessment
+- 可能后移：Epic 4 中供应商健康可视化的高级告警与复杂策略配置。
+- 已明确：首批场景为登录验证码，邮件渠道先行。
+- 复杂度关注：全链路反应式 + 多交付物并行，3 周需严格分阶段。
+
+### Technical Readiness
+- 约束清晰：Java 21、Spring Boot 3 + WebFlux、PostgreSQL、Kafka、Caffeine、Vue3/AntD、JWT、ELK、Prometheus/Grafana。
+- 技术风险：全链路反应式 I/O、一致性状态流转、故障转移策略、JDK 包分发与兼容。
+- 架构深挖建议：数据模型/一致性方案、异步消息语义、回执处理、SDK 版本策略、部署与可观测性。
+
+### Recommendations
+1. 补充用户研究/竞品分析与成功指标基线（哪怕是简要假设）。
+2. 明确本地可测试性要求与首史诗初始化清单。
+3. 细化安全/合规与数据一致性策略。
+
+### Final Decision
+- **NEEDS REFINEMENT**：已接近架构阶段，但建议补齐上述 HIGH 项后再进入正式架构设计。
+
+## Next Steps
+
+### UX Expert Prompt
+请基于本 PRD，为管理控制台（ass-kicker-admin）输出高层 UX 方案：信息架构、核心页面与关键交互（日志/模板/路由/供应商/回执），并考虑 WCAG AA 与高密度数据展示。
+
+### Architect Prompt
+请基于本 PRD 设计整体架构，遵循技术约束：Java 21、Spring Boot 3 + WebFlux、PostgreSQL、Kafka、Caffeine，全链路反应式。交付物包括 ass-kicker-server、ass-kicker-channel-builder、ass-kicker-java-client、ass-kicker-admin；重点输出数据模型、消息流转、路由/重试/回执机制、集成与部署方案、可观测性与安全策略。
+

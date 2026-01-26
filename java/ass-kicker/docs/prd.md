@@ -22,6 +22,7 @@
 | Date       | Version | Description                                 | Author    |
 | ---------- | ------- | ------------------------------------------- | --------- |
 | 2026-01-23 | v0.1    | 初稿：基于 Project Brief 起草 Goals/Context | John (PM) |
+| 2026-01-26 | v0.2    | 同步架构最终选择                             | Codex     |
 
 ## MVP Scope
 
@@ -95,6 +96,7 @@
 ### Service Architecture
 
 模块化单体 + 全链路异步反应式：API 服务采用 Spring Boot 3 + WebFlux（Reactive NIO），与 Kafka 驱动的异步处理链路协同；MVP 以单体为主，后续可拆分为多服务。
+部署形态：API 与 Worker 独立进程（同仓多模块）。
 
 ### Testing Requirements
 
@@ -111,8 +113,9 @@ Unit + Integration
 - 数据库：PostgreSQL（用于模板、日志、状态与审计）
 - 缓存：Caffeine
 - 消息中间件：Kafka（异步队列与广播支撑）
+- 部署平台：企业内 Kubernetes（单 Region，MVP）
 - 推送通道：APNs/FCM/WNS 等系统推送服务
-- 鉴权方式：服务间鉴权（API Key 或 OAuth2/JWT，待定）
+- 鉴权方式：JWT 为主，兼容 API Key（服务间/系统间调用）
 - 可观测性：日志/指标/追踪需覆盖路由、投递、回执关键路径
 - 前端：Vue 3
 - 组件库：Ant Design Vue
@@ -147,7 +150,7 @@ Unit + Integration
 
 ### API & Client Versioning (Draft)
 - API 版本策略：URI 前缀版本（例如 `/api/v1`），保持向后兼容
-- 鉴权方式：JWT
+- 鉴权方式：JWT 为主，兼容 API Key
 - 幂等性：发送接口需支持幂等键，避免重复投递
 - Java 客户端分发：内部 Maven 发布（ass-kicker-java-client），版本遵循语义化（SemVer）
 - 兼容策略：客户端与 API 版本可独立演进，保证同主版本向后兼容
@@ -157,6 +160,7 @@ Unit + Integration
 
 ### Deployment & Environments
 - 支持最少 2 套环境：测试环境与生产环境
+- 单 Region（MVP），可按需扩展多 Region
 - 服务可水平扩展（WebFlux + Kafka Worker）
 - MVP 不要求多可用区/多地域
 
@@ -172,6 +176,7 @@ Unit + Integration
 ### Audit & Security Operations
 - 审计日志：模板/路由/供应商/限流配置变更可追溯
 - JWT 密钥与权限管理需符合企业安全规范
+- 浏览器端 Token 存储默认使用 HttpOnly Cookie；非浏览器客户端使用 Authorization Header
 
 ### Backup & Recovery
 - 关键数据（模板/路由/消息状态）需具备备份与恢复机制

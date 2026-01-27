@@ -3,6 +3,23 @@
 **Epic Goal**  
 建立统一通知投递的最小可运行闭环：业务系统可以通过统一接口提交通知请求，系统完成鉴权、入队与基础处理，并能返回可追踪的状态。这一史诗确保平台基础能力可被集成验证，为后续路由与治理能力奠定基础。
 
+## Story 1.0 工程初始化与本地可验证闭环
+
+As a 平台工程团队,  
+I want 建立统一的工程骨架与本地最小验证路径,  
+so that 后续故事可以在一致的项目结构与可运行环境上快速推进与回归验证。
+
+**Acceptance Criteria**
+
+1. Monorepo 基础结构已落地并可构建，至少包含：`ass-kicker-server`、`ass-kicker-worker`、`ass-kicker-channel-builder`、`ass-kicker-java-client`、`ass-kicker-admin` 与根级聚合构建配置。
+2. 本地依赖（PostgreSQL 与 Kafka）具备最小可运行方案（例如 docker compose 或等价方式），并在文档中给出启动步骤与必要端口约定（参考 `docs/development-environment-minimal.md` 与 `infra/local-dev/docker-compose.yml`）。
+3. 提供最小环境变量样例（使用根目录 `.env.example`），覆盖数据库连接、Kafka 地址与鉴权密钥引用等关键配置项（参考 `docs/development-environment-minimal.md`）。
+4. 后端服务至少暴露一个健康检查或就绪性端点（如 `/actuator/health`），用于验证本地启动成功。
+5. 提供“一条龙本地验证路径”：从启动依赖 → 启动服务 → 调用健康检查/最小 API 的步骤清单可被开发者直接执行并得到可观察结果（参考 `docs/development-environment-minimal.md`）。
+6. 初始化阶段不得引入与既定技术约束冲突的替代方案（需对齐 Java 21、Spring Boot 3 + WebFlux、PostgreSQL、Kafka、Vue 3）。
+
+**Prerequisite**：无
+
 ## Story 1.1 统一发送 API 与鉴权
 
 As a 业务系统研发团队,  
@@ -16,6 +33,8 @@ so that 我可以快速接入平台并安全地发起通知。
 3. 请求校验覆盖必填字段、模板参数与目标地址格式。
 4. 成功请求返回全局唯一的消息 ID 与初始状态（如 Queued）。
 5. API 响应时间满足常规请求 SLA（与 NFR3 保持一致）。
+
+**Prerequisite**：Story 1.0
 
 ## Story 1.2 异步投递处理闭环
 
@@ -32,6 +51,64 @@ so that 我能获得稳定的投递处理能力且不阻塞业务线程。
 
 **Prerequisite**：Story 1.1
 
+## Story 1.3 消息状态查询与日志检索基础能力
+
+As a 平台运营/业务系统研发团队,  
+I want 查询消息状态与基础日志,  
+so that 我可以追踪投递结果并为后续治理能力提供数据基础。
+
+**Story Context**
+
+**Existing System Integration:**
+- Integrates with: ass-kicker-server API 与异步处理链路
+- Technology: Spring Boot 3 + WebFlux, PostgreSQL, Kafka
+- Follows pattern: 反应式链路、统一错误格式、版本化 REST API
+- Touch points: message / delivery_attempt / receipt 查询与投影
+
+**Acceptance Criteria**
+
+**Functional Requirements:**
+1. 提供消息状态查询接口（`GET /api/v1/messages/{id}`），返回 messageId、status、channel、provider（如有）与 lastUpdatedAt。
+2. 提供基础日志查询接口（`GET /api/v1/logs`），至少支持按时间范围、渠道、供应商与状态过滤，并返回可用于列表展示的最小字段集。
+3. 查询结果中的状态枚举与状态流转口径与异步处理链路保持一致（Queued/Processing/Sent/Delivered/Failed）。
+
+**Integration Requirements:**
+4. 不改变 `POST /api/v1/messages/send` 的对外契约与返回语义（messageId 保持可追踪与一致）。
+5. 查询接口必须复用 Story 1.1 的鉴权与权限校验边界。
+6. 为 Epic 3 的日志/审计能力与 Epic 4 的日志可视化提供稳定的最小可用接口契约。
+
+**Quality Requirements:**
+7. 为状态查询与日志查询补充单元测试/集成测试，覆盖存在/不存在/鉴权失败与关键过滤条件。
+8. 在 API 文档或 README 中补充查询接口的最小使用说明与字段说明。
+
+**Technical Notes**
+- **Integration Approach:** 基于 Story 1.2 已落库/已流转的消息与尝试记录提供查询投影，避免阻塞式调用。
+- **Existing Pattern Reference:** 遵循 `docs/architecture.md` 中的反应式与统一错误格式规则。
+- **Key Constraints:** 保持 `/api/v1` 版本前缀与向后兼容原则。
+
+**Definition of Done**
+- [ ] Functional requirements met
+- [ ] Integration requirements verified
+- [ ] Existing functionality regression tested
+- [ ] Code follows existing patterns and standards
+- [ ] Tests pass (existing and new)
+- [ ] Documentation updated if applicable
+
+### 1.3 风险与兼容性检查
+
+**Minimal Risk Assessment:**
+- **Primary Risk:** 查询口径与异步状态流转不一致，导致运营误判。
+- **Mitigation:** 统一状态枚举与映射口径，并在接口响应中返回 lastUpdatedAt。
+- **Rollback:** 通过配置开关或下线路由回退查询入口，不影响发送链路。
+
+**Compatibility Verification:**
+- [ ] No breaking changes to existing APIs
+- [ ] Database changes (if any) are additive only
+- [ ] UI changes follow existing design patterns
+- [ ] Performance impact is negligible
+
+**Prerequisite**：Story 1.2
+
 ## Story 1.4 开发者接入产物与模板
 
 As a 平台工程团队,  
@@ -45,50 +122,4 @@ so that 新渠道开发与业务系统接入更高效、标准化。
 3. 提供可分发的 JDK 打包产物，用于业务系统快速对接与运行依赖。
 4. 模板与打包产物有基础文档说明其使用方式。
 
-**Prerequisite**：Story 1.1## Epic 2 Routing & Resilience
-
-**Epic Goal**  
-引入智能路由与可靠性机制：在多供应商条件下自动选择最优投递路径，并在失败时进行故障转移与重试，确保送达率与可用性达到目标。
-
-## Story 2.1 路由规则与供应商选择
-
-As a 平台运营/可靠性团队,  
-I want 配置路由规则并基于规则选择供应商,  
-so that 系统可以按地址/语言/时间等条件自动路由。
-
-**Acceptance Criteria**
-
-1. 支持配置至少三类规则维度（如地址/语言/时间）。
-2. 路由规则可按优先级排序并生效。
-3. 每个规则可绑定一个或多个供应商候选。
-4. 路由决策结果可在消息记录中追溯。
-
-## Story 2.2 故障转移与重试策略
-
-As a 平台运营/可靠性团队,  
-I want 在供应商失败时自动故障转移并按策略重试,  
-so that 提升送达率并降低单供应商波动影响。
-
-**Acceptance Criteria**
-
-1. 支持配置基础重试策略（次数 + 指数退避）。
-2. 当供应商失败达到阈值时，自动切换至备用供应商。
-3. 故障转移与重试过程记录在消息状态/日志中。
-4. 失败最终状态可区分“已穷尽重试”。
-
-**Prerequisite**：Story 2.1
-
-## Story 2.3 优先级调度
-
-As a 平台运营团队,  
-I want 不同优先级的消息被不同队列策略处理,  
-so that 紧急消息能更快送达。
-
-**Acceptance Criteria**
-
-1. 至少支持 Emergency/High/Normal/Low/Background 五级优先级。
-2. 不同优先级映射到独立队列或调度策略。
-3. 处理时延与优先级相关联（高优先级不低于低优先级的处理速度）。
-4. 调度策略可配置，且默认配置可用。
-
-**Prerequisite**：Story 1.2
+**Prerequisite**：Story 1.1

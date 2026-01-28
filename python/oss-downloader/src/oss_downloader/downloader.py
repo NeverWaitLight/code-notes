@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, Optional
 
 from .config import DownloadConfig
 from .filters import matches_suffix
@@ -22,21 +22,32 @@ class DownloadSummary:
     total_size: int
 
 
+@dataclass(frozen=True)
+class PreviewInfo:
+    total: int | None
+    total_size: int | None
+    preview_names: list[str]
+
+
+FILE_PREVIEW_LIMIT = 10
+
+
 def preview_objects(
     client: OssClient,
     prefix: str,
     suffixes: Optional[Iterable[str]],
-) -> Tuple[int, int]:
-    total_count = 0
-    total_size = 0
+) -> PreviewInfo:
+    _ = suffixes
+    preview_names: list[str] = []
     for obj in client.list_objects(prefix=prefix):
-        if _is_folder_marker(obj):
-            continue
-        if not matches_suffix(obj.key, suffixes):
-            continue
-        total_count += 1
-        total_size += int(obj.size)
-    return total_count, total_size
+        preview_names.append(obj.key)
+        if len(preview_names) >= FILE_PREVIEW_LIMIT:
+            break
+    return PreviewInfo(
+        total=None,
+        total_size=None,
+        preview_names=preview_names,
+    )
 
 
 def prepare_manifest(
@@ -45,11 +56,14 @@ def prepare_manifest(
     suffixes: Optional[Iterable[str]],
     manifest: Manifest,
     batch_size: int = 500,
-) -> Tuple[int, int]:
+) -> PreviewInfo:
     total_count = 0
     total_size = 0
+    preview_names: list[str] = []
     batch: list[ObjectItem] = []
     for obj in client.list_objects(prefix=prefix):
+        if len(preview_names) < FILE_PREVIEW_LIMIT:
+            preview_names.append(obj.key)
         if _is_folder_marker(obj):
             continue
         if not matches_suffix(obj.key, suffixes):
@@ -62,7 +76,11 @@ def prepare_manifest(
             batch = []
     if batch:
         manifest.add_objects(batch)
-    return total_count, total_size
+    return PreviewInfo(
+        total=total_count,
+        total_size=total_size,
+        preview_names=preview_names,
+    )
 
 
 def execute_download(

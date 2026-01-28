@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 import questionary
 
 from .config import DownloadConfig
-from .downloader import DownloadSummary, execute_download, prepare_manifest, preview_objects
+from .downloader import DownloadSummary, PreviewInfo, execute_download, prepare_manifest, preview_objects
 from .filters import parse_suffixes
 from .manifest import Manifest
 from .oss_client import OssClient
@@ -36,7 +36,7 @@ def run() -> int:
 
         if config.dry_run:
             try:
-                total_count, total_size = preview_objects(
+                preview = preview_objects(
                     client,
                     config.normalized_prefix(),
                     suffixes,
@@ -45,14 +45,14 @@ def run() -> int:
                 _print_oss_error(exc)
                 _pause_on_error()
                 return 1
-            _print_preview(total_count, total_size)
+            _print_preview(preview)
             return 0
 
         print("正在列举对象，请稍候...")
         manifest = Manifest(config.manifest_path)
         try:
             try:
-                total_count, total_size = prepare_manifest(
+                preview = prepare_manifest(
                     client,
                     config.normalized_prefix(),
                     suffixes,
@@ -63,20 +63,19 @@ def run() -> int:
                 _pause_on_error()
                 return 1
 
-            if total_count == 0:
+            _print_preview(preview)
+            if preview.total == 0:
                 print("未找到可下载对象。")
                 return 0
-
-            _print_preview(total_count, total_size)
-            _print_match_stats(total_count, manifest)
+            _print_match_stats(manifest)
             if not questionary.confirm("确认开始下载？", default=True).ask():
                 print("已取消下载。")
                 return 0
 
             progress = ProgressReporter()
-            summary = execute_download(config, client, manifest, progress, total_size)
+            summary = execute_download(config, client, manifest, progress, preview.total_size)
             manifest.export_failed_csv(config.failed_csv_path)
-            _print_summary(summary, total_count)
+            _print_summary(summary, manifest)
 
             if summary.failed > 0:
                 return 2
@@ -218,30 +217,28 @@ def _infer_region(endpoint: str) -> str | None:
     return match.group(1)
 
 
-def _print_preview(total_count: int, total_size: int) -> None:
-    print("预览统计:")
-    print(f"  对象数量: {total_count}")
-    print(f"  总大小: {_format_size(total_size)}")
+def _print_preview(preview: PreviewInfo) -> None:
+    print("预览对象(前 10 个):")
+    if not preview.preview_names:
+        print("  (无)")
+        return
+    for name in preview.preview_names:
+        print(f"  {name}")
 
 
-def _print_summary(summary: DownloadSummary, total_matched: int) -> None:
+def _print_summary(summary: DownloadSummary, manifest: Manifest) -> None:
+    pending_count = len(manifest.list_by_status(["pending", "failed"]))
     print("下载完成:")
-    print(f"  匹配总数: {total_matched}")
-    print(f"  成功: {summary.success}")
-    print(f"  失败: {summary.failed}")
-    print(f"  跳过: {summary.skipped}")
-    print(f"  总大小: {_format_size(summary.total_size)}")
-    print(f"  用时: {_format_duration(summary.duration_sec)}")
+    print(f"  已下载总数: {summary.success}")
+    print(f"  已遍历未下载: {pending_count}")
 
 
-def _print_match_stats(total_count: int, manifest: Manifest) -> None:
+def _print_match_stats(manifest: Manifest) -> None:
     summary = manifest.summary()
     pending_count = len(manifest.list_by_status(["pending"]))
-    done_count = summary["success"] + summary["failed"]
     print("下载统计:")
-    print(f"  匹配对象总数: {total_count}")
-    print(f"  已完成(历史): {done_count}")
-    print(f"  待下载(本次): {pending_count}")
+    print(f"  已下载总数: {summary['success']}")
+    print(f"  已遍历未下载: {pending_count}")
 
 
 def _print_oss_error(exc: Exception) -> None:

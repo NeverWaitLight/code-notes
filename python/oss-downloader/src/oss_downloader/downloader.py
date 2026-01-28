@@ -6,6 +6,7 @@ from pathlib import Path, PurePosixPath
 from typing import Iterable, Optional
 
 from .config import DownloadConfig
+from .file_utils import sanitize_filename
 from .filters import matches_suffix
 from .manifest import Manifest, ManifestRow
 from .oss_client import ObjectItem, OssClient
@@ -259,7 +260,9 @@ def _safe_target_path(base_dir: Path, key: str) -> Path:
     parts = [part for part in posix_path.parts if part not in ("", ".", "..")]
     if not parts:
         parts = ["object"]
-    return base_dir.joinpath(*parts)
+    # Sanitize each path component to remove invalid filesystem characters
+    sanitized_parts = [sanitize_filename(part) for part in parts]
+    return base_dir.joinpath(*sanitized_parts)
 
 
 def _is_folder_marker(item: ObjectItem) -> bool:

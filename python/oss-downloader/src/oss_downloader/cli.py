@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import questionary
 
@@ -26,6 +28,7 @@ def run() -> int:
 
         client = OssClient(
             endpoint=config.endpoint,
+            region=config.region,
             access_key_id=config.access_key_id,
             access_key_secret=config.access_key_secret,
             bucket=config.bucket,
@@ -112,6 +115,12 @@ def _prompt_config() -> DownloadConfig | None:
         print("Bucket 不能为空。", file=sys.stderr)
         return None
 
+    region_default = _infer_region(endpoint)
+    region = questionary.text("Region (例如 cn-chengdu):", default=region_default or "").ask()
+    if not region:
+        print("Region 不能为空（V4 签名必填）。", file=sys.stderr)
+        return None
+
     prefix = questionary.text("Prefix (可为空):", default="").ask() or ""
     prefix = prefix.strip()
 
@@ -143,6 +152,7 @@ def _prompt_config() -> DownloadConfig | None:
 
     config = DownloadConfig.from_prompt(
         endpoint=endpoint,
+        region=region,
         access_key_id=access_key_id,
         access_key_secret=access_key_secret,
         bucket=bucket,
@@ -156,8 +166,27 @@ def _prompt_config() -> DownloadConfig | None:
 
 
 def _ask_int(label: str, default: int, minimum: int, maximum: int) -> int | None:
+    env_value = os.environ.get("OSS_DOWNLOADER_CONCURRENCY")
+    if env_value:
+        try:
+            value = int(env_value.strip())
+        except ValueError:
+            print("环境变量 OSS_DOWNLOADER_CONCURRENCY 不是整数，已忽略。", file=sys.stderr)
+        else:
+            if minimum <= value <= maximum:
+                return value
+            print(
+                f"环境变量 OSS_DOWNLOADER_CONCURRENCY 超出范围 {minimum}~{maximum}，已忽略。",
+                file=sys.stderr,
+            )
+
     while True:
-        raw = questionary.text(f"{label}:", default=str(default)).ask()
+        if os.environ.get("OSS_DOWNLOADER_SIMPLE_PROMPT") == "1":
+            raw = input(f"{label} (默认 {default}): ")
+            if raw == "":
+                raw = str(default)
+        else:
+            raw = questionary.text(f"{label}:", default=str(default)).ask()
         if raw is None:
             return None
         raw = raw.strip()
@@ -172,6 +201,21 @@ def _ask_int(label: str, default: int, minimum: int, maximum: int) -> int | None
             print(f"数值范围必须在 {minimum}~{maximum} 之间。", file=sys.stderr)
             continue
         return value
+
+
+def _infer_region(endpoint: str) -> str | None:
+    raw = endpoint.strip()
+    if not raw:
+        return None
+    if not raw.startswith("http://") and not raw.startswith("https://"):
+        raw = "https://" + raw
+    parsed = urlparse(raw)
+    host = parsed.netloc or parsed.path
+    host = host.split("/")[0].split(":")[0]
+    match = re.search(r"(?:^|\.)oss-([a-z0-9-]+?)(?:-internal)?\.", host)
+    if not match:
+        return None
+    return match.group(1)
 
 
 def _print_preview(total_count: int, total_size: int) -> None:

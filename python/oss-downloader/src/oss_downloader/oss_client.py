@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterator
+from urllib.parse import urlparse
 
 import oss2
 
@@ -16,15 +17,31 @@ class ObjectItem:
 
 
 class OssClient:
-    def __init__(self, endpoint: str, access_key_id: str, access_key_secret: str, bucket: str) -> None:
-        auth = oss2.Auth(access_key_id, access_key_secret)
-        self.bucket = oss2.Bucket(auth, endpoint, bucket)
+    def __init__(
+        self,
+        endpoint: str,
+        region: str,
+        access_key_id: str,
+        access_key_secret: str,
+        bucket: str,
+    ) -> None:
+        endpoint = _normalize_endpoint(endpoint)
+        auth = oss2.AuthV4(access_key_id, access_key_secret)
+        self.bucket = oss2.Bucket(auth, endpoint, bucket, region=region)
 
     def list_objects(self, prefix: str) -> Iterator[ObjectItem]:
-        token: str | None = ""
+        token: str | None = None
         while True:
-            result = self.bucket.list_objects_v2(prefix=prefix, continuation_token=token or None)
-            for obj in result.object_list:
+            # Only pass continuation_token if it's not None to avoid V4 signature issues
+            if token:
+                result = self.bucket.list_objects_v2(prefix=prefix, continuation_token=token)
+            else:
+                result = self.bucket.list_objects_v2(prefix=prefix)
+
+            object_list = result.object_list
+            if object_list is None:
+                object_list = []
+            for obj in object_list:
                 last_modified = None
                 if getattr(obj, "last_modified", None):
                     last_modified = datetime.fromtimestamp(obj.last_modified)
@@ -40,3 +57,15 @@ class OssClient:
 
     def download_to_file(self, key: str, dest_path: str) -> None:
         self.bucket.get_object_to_file(key, dest_path)
+
+
+def _normalize_endpoint(endpoint: str) -> str:
+    raw = endpoint.strip()
+    if not raw:
+        return raw
+    if raw.startswith("http://") or raw.startswith("https://"):
+        return raw
+    parsed = urlparse("https://" + raw)
+    if parsed.netloc:
+        return "https://" + raw
+    return raw

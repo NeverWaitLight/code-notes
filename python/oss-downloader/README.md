@@ -23,11 +23,22 @@ PYTHONPATH=src python -m oss_downloader
 ## 交互流程
 
 1. 输入 Endpoint、AccessKeyId、AccessKeySecret
-2. 输入 bucket 与 prefix（可空）
-3. 选择目标下载目录与并发数
-4. 可选输入后缀过滤（例如 `.jpg,.png`）
-5. 可选仅预览不下载
-6. 确认后开始下载
+2. 输入 bucket 与 Region（例如 `cn-chengdu`）
+3. 输入 prefix（可空）
+4. 选择目标下载目录与并发数
+5. 可选输入后缀过滤（例如 `.jpg,.png`）
+6. 可选仅预览不下载
+7. 确认后开始下载
+
+## 兼容性提示
+
+- 如出现“卡在并发数”等终端交互异常，可设置 `OSS_DOWNLOADER_SIMPLE_PROMPT=1` 使用简化输入。
+- 也可设置 `OSS_DOWNLOADER_CONCURRENCY=8` 跳过并发数输入（范围 1~64）。
+
+## 关于签名版本
+
+- 默认使用 V4 签名，需要提供 Region。
+- Endpoint 建议填写公网域名，例如 `oss-cn-chengdu.aliyuncs.com` 或带 `https://` 的完整地址。
 
 ## 下载策略
 

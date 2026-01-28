@@ -8,6 +8,7 @@ from typing import Iterable, List, Optional
 @dataclass(frozen=True)
 class DownloadConfig:
     endpoint: str
+    region: str
     access_key_id: str
     access_key_secret: str
     bucket: str
@@ -50,6 +51,7 @@ class DownloadConfig:
     @staticmethod
     def from_prompt(
         endpoint: str,
+        region: str,
         access_key_id: str,
         access_key_secret: str,
         bucket: str,
@@ -62,6 +64,7 @@ class DownloadConfig:
         suffixes = list(include_suffixes) if include_suffixes else None
         return DownloadConfig(
             endpoint=endpoint.strip(),
+            region=region.strip(),
             access_key_id=access_key_id.strip(),
             access_key_secret=access_key_secret.strip(),
             bucket=bucket.strip(),

@@ -83,8 +83,8 @@ def run() -> int:
         finally:
             manifest.close()
     except KeyboardInterrupt:
-        print("已取消。", file=sys.stderr)
-        return 1
+        print("\n操作已取消。", file=sys.stderr)
+        return 130
     except Exception as exc:  # noqa: BLE001
         _log_exception("发生未处理错误")
         print("发生错误，请查看日志：~/.oss-downloader.log", file=sys.stderr)

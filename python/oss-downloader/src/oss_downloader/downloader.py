@@ -95,29 +95,33 @@ def execute_download(
     initial_summary = manifest.summary()
     initial_success = initial_summary["success"]
 
-    pending = manifest.list_by_status(["pending"])
-    if pending:
-        _run_pass(
-            config,
-            client,
-            manifest,
-            progress,
-            pending,
-            allow_multi_attempt=False,
-            pass_label="首轮下载",
-        )
+    try:
+        pending = manifest.list_by_status(["pending"])
+        if pending:
+            _run_pass(
+                config,
+                client,
+                manifest,
+                progress,
+                pending,
+                allow_multi_attempt=False,
+                pass_label="首轮下载",
+            )
 
-    failed_for_retry = manifest.list_failed_for_retry(config.retry_max)
-    if failed_for_retry:
-        _run_pass(
-            config,
-            client,
-            manifest,
-            progress,
-            failed_for_retry,
-            allow_multi_attempt=True,
-            pass_label="失败重试",
-        )
+        failed_for_retry = manifest.list_failed_for_retry(config.retry_max)
+        if failed_for_retry:
+            _run_pass(
+                config,
+                client,
+                manifest,
+                progress,
+                failed_for_retry,
+                allow_multi_attempt=True,
+                pass_label="失败重试",
+            )
+    except KeyboardInterrupt:
+        print("下载已中断。")
+        raise
 
     summary = manifest.summary()
     duration = time.monotonic() - start
@@ -150,7 +154,9 @@ def _run_pass(
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    with ThreadPoolExecutor(max_workers=config.concurrency) as executor:
+    executor = ThreadPoolExecutor(max_workers=config.concurrency)
+    interrupted = False
+    try:
         futures = []
         for row in rows_list:
             if allow_multi_attempt:
@@ -181,7 +187,21 @@ def _run_pass(
             else:
                 progress.advance_failed()
 
-    progress.stop()
+    except KeyboardInterrupt:
+        interrupted = True
+        print("\n检测到中断信号，正在停止下载...")
+        for future in futures:
+            future.cancel()
+        progress.stop()
+        raise
+    finally:
+        if interrupted:
+            executor.shutdown(wait=False)
+        else:
+            executor.shutdown(wait=True)
+
+    if not interrupted:
+        progress.stop()
 
 
 def _download_once(

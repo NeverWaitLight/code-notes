@@ -115,7 +115,7 @@ def _prompt_config() -> DownloadConfig | None:
         return None
 
     region_default = _infer_region(endpoint)
-    region = questionary.text("Region (例如 cn-chengdu):", default=region_default or "").ask()
+    region = questionary.text("Region:", default=region_default or "").ask()
     if not region:
         print("Region 不能为空（V4 签名必填）。", file=sys.stderr)
         return None

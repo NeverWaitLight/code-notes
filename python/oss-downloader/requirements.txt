@@ -1,4 +1,0 @@
-oss2>=2.18.4
-rich
-questionary
-pyinstaller

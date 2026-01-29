@@ -53,11 +53,44 @@ find_python() {
   fi
 }
 
+collect_windows_runtime_binaries() {
+  "$pybin" - <<'PY'
+import sys
+from pathlib import Path
+
+base = Path(sys.base_prefix)
+search_dirs = [base, base / "DLLs"]
+patterns = ["vcruntime*.dll", "msvcp*.dll", "concrt140.dll", "ucrtbase.dll"]
+
+seen = set()
+for d in search_dirs:
+    if not d.is_dir():
+        continue
+    for pattern in patterns:
+        for p in d.glob(pattern):
+            rp = str(p.resolve())
+            key = rp.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            print(rp)
+PY
+}
+
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 export PYTHONPATH="$repo_root/src"
 pybin="$(find_python)"
+
+add_binaries=()
+if [ "$platform" = "windows" ]; then
+  while IFS= read -r dll; do
+    dll="${dll%$'\r'}"
+    [ -n "$dll" ] || continue
+    add_binaries+=(--add-binary "${dll};.")
+  done < <(collect_windows_runtime_binaries)
+fi
 
 "$pybin" -m PyInstaller \
   --onefile \
@@ -65,6 +98,7 @@ pybin="$(find_python)"
   --clean \
   -n oss-downloader \
   -p "$repo_root/src" \
+  "${add_binaries[@]}" \
   "$repo_root/src/oss_downloader/__main__.py"
 
 echo "Build complete for $platform. Output: dist/" >&2
